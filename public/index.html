@@ -11,33 +11,86 @@
     <header>
       <h1>🔥 热点追踪</h1>
       <p class="subtitle">多源实时热点聚合</p>
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="trends">热点总览</button>
+        <button class="tab-btn" data-tab="keywords">关键词监控</button>
+      </div>
     </header>
 
-    <div class="toolbar">
-      <div class="source-filters" id="sourceFilters">
-        <button class="filter-btn active" data-source="all">全部</button>
-      </div>
-      <div class="actions">
-        <span id="status" class="status"></span>
-        <button id="analyzeBtn" class="analyze-btn">AI 分析</button>
-        <button id="refreshBtn" class="refresh-btn">手动刷新</button>
+    <!-- Notification banner -->
+    <div id="alertBanner" class="alert-banner" style="display:none;">
+      <div class="alert-content">
+        <span class="alert-icon">🔔</span>
+        <span id="alertText"></span>
+        <button id="alertDismiss" class="alert-dismiss">×</button>
       </div>
     </div>
 
-    <div id="analysisPanel" class="analysis-panel" style="display:none;">
-      <div class="analysis-header">
-        <h2>🤖 AI 热点分析</h2>
-        <span id="analysisTime" class="analysis-time"></span>
+    <!-- === Trends Tab === -->
+    <div id="trendsTab" class="tab-content active">
+      <div class="toolbar">
+        <div class="source-filters" id="sourceFilters">
+          <button class="filter-btn active" data-source="all">全部</button>
+        </div>
+        <div class="actions">
+          <span id="status" class="status"></span>
+          <button id="analyzeBtn" class="analyze-btn">AI 分析</button>
+          <button id="refreshBtn" class="refresh-btn">手动刷新</button>
+        </div>
       </div>
-      <p id="analysisSummary" class="analysis-summary"></p>
-      <div id="analysisTopics" class="analysis-topics"></div>
+
+      <div id="analysisPanel" class="analysis-panel" style="display:none;">
+        <div class="analysis-header">
+          <h2>🤖 AI 热点分析</h2>
+          <span id="analysisTime" class="analysis-time"></span>
+        </div>
+        <p id="analysisSummary" class="analysis-summary"></p>
+        <div id="analysisTopics" class="analysis-topics"></div>
+      </div>
+
+      <div id="trendsList" class="trends-list">
+        <div class="loading">加载中...</div>
+      </div>
+
+      <div class="pagination" id="pagination"></div>
     </div>
 
-    <div id="trendsList" class="trends-list">
-      <div class="loading">加载中...</div>
-    </div>
+    <!-- === Keywords Tab === -->
+    <div id="keywordsTab" class="tab-content" style="display:none;">
+      <div class="keyword-section">
+        <div class="keyword-input-row">
+          <input type="text" id="keywordInput" placeholder="输入要监控的关键词，如：AI编程" maxlength="100" />
+          <input type="text" id="scopeInput" placeholder="分类（可选）" maxlength="50" />
+          <button id="addKeywordBtn" class="refresh-btn">添加监控</button>
+        </div>
+        <div class="keyword-actions">
+          <button id="checkKeywordsBtn" class="analyze-btn">立即检查</button>
+          <button id="collectKeywordTrendsBtn" class="analyze-btn">采集关键词热点</button>
+        </div>
+      </div>
 
-    <div class="pagination" id="pagination"></div>
+      <div id="keywordList" class="keyword-list"></div>
+
+      <!-- Keyword detail panel (alerts + trends) -->
+      <div id="keywordDetail" class="keyword-detail" style="display:none;">
+        <div class="detail-header">
+          <h3 id="detailTitle"></h3>
+          <button id="closeDetail" class="alert-dismiss">×</button>
+        </div>
+        <div class="detail-tabs">
+          <button class="detail-tab-btn active" data-dtab="alerts">告警通知</button>
+          <button class="detail-tab-btn" data-dtab="ktrends">相关热点</button>
+        </div>
+        <div id="detailAlerts" class="detail-content"></div>
+        <div id="detailTrends" class="detail-content" style="display:none;"></div>
+      </div>
+
+      <!-- Recent alerts -->
+      <div class="recent-alerts-section">
+        <h3>🔔 最近告警</h3>
+        <div id="recentAlerts" class="recent-alerts"></div>
+      </div>
+    </div>
 
     <div id="fetchStatus" class="fetch-status"></div>
   </div>

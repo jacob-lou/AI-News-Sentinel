@@ -40,3 +40,49 @@ model TrendAnalysis {
   model     String
   createdAt DateTime @default(now())
 }
+
+model MonitorKeyword {
+  id        Int      @id @default(autoincrement())
+  keyword   String
+  scope     String   @default("general") // general, AI编程, crypto, etc.
+  active    Boolean  @default(true)
+  interval  Int      @default(10) // minutes between checks
+  createdAt DateTime @default(now())
+  alerts    KeywordAlert[]
+  trends    KeywordTrend[]
+
+  @@unique([keyword])
+}
+
+model KeywordAlert {
+  id        Int      @id @default(autoincrement())
+  keywordId Int
+  keyword   MonitorKeyword @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+  title     String
+  url       String?
+  source    String
+  snippet   String?
+  verified  Boolean  @default(false)
+  aiReason  String?
+  notified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([keywordId])
+  @@index([createdAt])
+}
+
+model KeywordTrend {
+  id        Int      @id @default(autoincrement())
+  keywordId Int
+  keyword   MonitorKeyword @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+  title     String
+  url       String?
+  source    String
+  score     Int      @default(0)
+  extra     String?
+  fetchedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([keywordId])
+  @@index([fetchedAt])
+}

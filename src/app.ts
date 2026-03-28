@@ -1,6 +1,7 @@
 import express from 'express'
 import path from 'path'
 import trendsRouter from './routes/trends'
+import keywordsRouter from './routes/keywords'
 
 const app = express()
 
@@ -9,6 +10,7 @@ app.use(express.static(path.join(__dirname, '../public')))
 
 // API routes
 app.use('/api', trendsRouter)
+app.use('/api', keywordsRouter)
 
 // SPA fallback
 app.get('/{*splat}', (_req, res) => {
