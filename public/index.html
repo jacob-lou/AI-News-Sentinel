@@ -4,95 +4,152 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>热点追踪</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="app">
-    <header>
-      <h1>🔥 热点追踪</h1>
-      <p class="subtitle">多源实时热点聚合</p>
-      <div class="tab-bar">
-        <button class="tab-btn active" data-tab="trends">热点总览</button>
-        <button class="tab-btn" data-tab="keywords">关键词监控</button>
-      </div>
-    </header>
+  <!-- Aceternity-inspired dot grid background -->
+  <div class="dot-grid" aria-hidden="true"></div>
+  <!-- Aceternity-inspired spotlight -->
+  <div class="spotlight" aria-hidden="true"></div>
 
-    <!-- Notification banner -->
+  <div id="app">
+    <!-- Top bar -->
+    <nav class="topbar">
+      <div class="topbar-left">
+        <svg class="logo-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        <span class="logo-text">热点追踪</span>
+        <span class="topbar-sep"></span>
+        <span id="status" class="conn-badge">连接中</span>
+      </div>
+      <div class="topbar-right">
+        <button id="refreshBtn" class="btn btn-ghost" title="刷新数据">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </button>
+        <button id="analyzeBtn" class="btn btn-accent" title="AI 分析">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span>AI 分析</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Tabs — Apple segmented control -->
+    <div class="tab-nav">
+      <button class="tab-item active" data-tab="trends">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        热点
+      </button>
+      <button class="tab-item" data-tab="keywords">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        监控
+        <span id="alertCount" class="badge" style="display:none;">0</span>
+      </button>
+    </div>
+
+    <!-- Alert banner — Aceternity moving-border -->
     <div id="alertBanner" class="alert-banner" style="display:none;">
-      <div class="alert-content">
-        <span class="alert-icon">🔔</span>
-        <span id="alertText"></span>
-        <button id="alertDismiss" class="alert-dismiss">×</button>
+      <div class="moving-border-box">
+        <div class="alert-inner">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span id="alertText"></span>
+          <button id="alertDismiss" class="btn-icon" aria-label="关闭">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- === Trends Tab === -->
-    <div id="trendsTab" class="tab-content active">
-      <div class="toolbar">
-        <div class="source-filters" id="sourceFilters">
-          <button class="filter-btn active" data-source="all">全部</button>
-        </div>
-        <div class="actions">
-          <span id="status" class="status"></span>
-          <button id="analyzeBtn" class="analyze-btn">AI 分析</button>
-          <button id="refreshBtn" class="refresh-btn">手动刷新</button>
+    <!-- ===== TRENDS TAB ===== -->
+    <main id="trendsTab" class="tab-content active">
+      <div class="filter-row">
+        <div class="source-pills" id="sourceFilters">
+          <button class="pill active" data-source="all">全部</button>
         </div>
       </div>
 
-      <div id="analysisPanel" class="analysis-panel" style="display:none;">
-        <div class="analysis-header">
-          <h2>🤖 AI 热点分析</h2>
-          <span id="analysisTime" class="analysis-time"></span>
+      <!-- AI Analysis — Aceternity glow card -->
+      <div id="analysisPanel" class="analysis-card" style="display:none;">
+        <div class="glow-border" aria-hidden="true"></div>
+        <div class="analysis-inner">
+          <div class="analysis-head">
+            <span class="analysis-label">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              AI 趋势分析
+            </span>
+            <span id="analysisTime" class="meta-text"></span>
+          </div>
+          <p id="analysisSummary" class="analysis-body"></p>
+          <div id="analysisTopics" class="topic-chips"></div>
         </div>
-        <p id="analysisSummary" class="analysis-summary"></p>
-        <div id="analysisTopics" class="analysis-topics"></div>
       </div>
 
-      <div id="trendsList" class="trends-list">
-        <div class="loading">加载中...</div>
+      <div id="trendsList" class="feed">
+        <div class="skeleton-group">
+          <div class="skeleton-line w80"></div>
+          <div class="skeleton-line w60"></div>
+          <div class="skeleton-line w80"></div>
+          <div class="skeleton-line w40"></div>
+          <div class="skeleton-line w80"></div>
+        </div>
       </div>
 
       <div class="pagination" id="pagination"></div>
-    </div>
+    </main>
 
-    <!-- === Keywords Tab === -->
-    <div id="keywordsTab" class="tab-content" style="display:none;">
-      <div class="keyword-section">
-        <div class="keyword-input-row">
-          <input type="text" id="keywordInput" placeholder="输入要监控的关键词，如：AI编程" maxlength="100" />
-          <input type="text" id="scopeInput" placeholder="分类（可选）" maxlength="50" />
-          <button id="addKeywordBtn" class="refresh-btn">添加监控</button>
+    <!-- ===== KEYWORDS TAB ===== -->
+    <section id="keywordsTab" class="tab-content" style="display:none;">
+      <div class="kw-add-row">
+        <div class="kw-inputs">
+          <input type="text" id="keywordInput" class="input" placeholder="输入关键词，如 AI编程" maxlength="100" />
+          <input type="text" id="scopeInput" class="input input-narrow" placeholder="分类" maxlength="50" />
         </div>
-        <div class="keyword-actions">
-          <button id="checkKeywordsBtn" class="analyze-btn">立即检查</button>
-          <button id="collectKeywordTrendsBtn" class="analyze-btn">采集关键词热点</button>
-        </div>
+        <button id="addKeywordBtn" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          添加
+        </button>
       </div>
 
-      <div id="keywordList" class="keyword-list"></div>
+      <div class="kw-actions-row">
+        <button id="checkKeywordsBtn" class="btn btn-ghost btn-sm">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          立即检查
+        </button>
+        <button id="collectKeywordTrendsBtn" class="btn btn-ghost btn-sm">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          采集热点
+        </button>
+      </div>
 
-      <!-- Keyword detail panel (alerts + trends) -->
-      <div id="keywordDetail" class="keyword-detail" style="display:none;">
-        <div class="detail-header">
-          <h3 id="detailTitle"></h3>
-          <button id="closeDetail" class="alert-dismiss">×</button>
+      <div id="keywordList" class="kw-grid"></div>
+
+      <!-- Detail panel -->
+      <div id="keywordDetail" class="kw-detail" style="display:none;">
+        <div class="kw-detail-head">
+          <h3 id="detailTitle" class="kw-detail-title"></h3>
+          <button id="closeDetail" class="btn-icon" aria-label="关闭">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
         <div class="detail-tabs">
-          <button class="detail-tab-btn active" data-dtab="alerts">告警通知</button>
-          <button class="detail-tab-btn" data-dtab="ktrends">相关热点</button>
+          <button class="detail-tab-btn active" data-dtab="alerts">告警</button>
+          <button class="detail-tab-btn" data-dtab="ktrends">热点</button>
         </div>
-        <div id="detailAlerts" class="detail-content"></div>
-        <div id="detailTrends" class="detail-content" style="display:none;"></div>
+        <div id="detailAlerts" class="detail-body"></div>
+        <div id="detailTrends" class="detail-body" style="display:none;"></div>
       </div>
 
-      <!-- Recent alerts -->
-      <div class="recent-alerts-section">
-        <h3>🔔 最近告警</h3>
+      <div class="section-block">
+        <h3 class="section-title">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          最近告警
+        </h3>
         <div id="recentAlerts" class="recent-alerts"></div>
       </div>
-    </div>
+    </section>
 
-    <div id="fetchStatus" class="fetch-status"></div>
+    <div id="fetchStatus" class="toast-container"></div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
