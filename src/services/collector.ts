@@ -5,6 +5,10 @@ import { RedditSource } from '../sources/reddit'
 import { HackerNewsSource } from '../sources/hackernews'
 import { DuckDuckGoSource } from '../sources/duckduckgo'
 import { TwitterSource } from '../sources/twitter'
+import { GitHubTrendingSource } from '../sources/github'
+import { HuggingFaceSource } from '../sources/huggingface'
+import { V2EXSource } from '../sources/v2ex'
+import { BingNewsSource } from '../sources/bingnews'
 
 export class CollectorService {
   private sources: TrendSource[] = []
@@ -14,6 +18,10 @@ export class CollectorService {
     this.sources.push(new RedditSource())
     this.sources.push(new HackerNewsSource())
     this.sources.push(new DuckDuckGoSource())
+    this.sources.push(new GitHubTrendingSource())
+    this.sources.push(new HuggingFaceSource())
+    this.sources.push(new V2EXSource())
+    this.sources.push(new BingNewsSource())
 
     const twitterApiKey = process.env.TWITTER_API_KEY
     if (twitterApiKey && twitterApiKey !== 'your_twitterapi_io_key_here') {
@@ -88,6 +96,7 @@ export class CollectorService {
             score: item.score,
             extra: item.extra,
             fetchedAt: new Date(),
+            publishedAt: item.publishedAt,
           },
           create: {
             title: item.title,
@@ -96,6 +105,7 @@ export class CollectorService {
             score: item.score,
             extra: item.extra,
             externalId: item.externalId,
+            publishedAt: item.publishedAt,
           },
         })
         saved.push(item)

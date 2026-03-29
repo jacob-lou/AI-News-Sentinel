@@ -24,6 +24,7 @@ export class GoogleTrendsSource implements TrendSource {
       const title = $(el).find('title').text().trim()
       const link = $(el).find('link').text().trim()
       const traffic = $(el).find('ht\\:approx_traffic, approx_traffic').text().trim()
+      const pubDate = $(el).find('pubDate').text().trim()
       const score = parseInt(traffic.replace(/[^0-9]/g, '')) || 0
 
       if (title) {
@@ -33,6 +34,7 @@ export class GoogleTrendsSource implements TrendSource {
           source: this.name,
           score,
           externalId: `google-${title.toLowerCase().replace(/\s+/g, '-')}`,
+          publishedAt: pubDate ? new Date(pubDate) : undefined,
           extra: JSON.stringify({ traffic }),
         })
       }

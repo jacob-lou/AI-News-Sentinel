@@ -156,20 +156,62 @@
       var extra = {};
       try { extra = JSON.parse(item.extra || '{}'); } catch {}
 
-      var titleHtml = item.url
-        ? '<a href="' + esc(item.url) + '" target="_blank" rel="noopener">' + esc(item.title) + '</a>'
-        : esc(item.title);
+      var isTweet = item.source === 'twitter' && extra.type === 'tweet';
+
+      // Twitter 推文特殊展示：显示作者信息
+      var titleHtml;
+      if (isTweet) {
+        var authorTag = extra.author ? '<span class="tw-author">@' + esc(extra.author) + '</span> ' : '';
+        var verifiedTag = extra.isVerified ? '<span class="tw-verified" title="认证账号">✓</span> ' : '';
+        var textContent = item.url
+          ? '<a href="' + esc(item.url) + '" target="_blank" rel="noopener">' + esc(item.title) + '</a>'
+          : esc(item.title);
+        titleHtml = authorTag + verifiedTag + textContent;
+      } else {
+        titleHtml = item.url
+          ? '<a href="' + esc(item.url) + '" target="_blank" rel="noopener">' + esc(item.title) + '</a>'
+          : esc(item.title);
+      }
 
       var rankNum = (currentPage - 1) * PAGE_SIZE + i + 1;
       var rankCls = rankNum <= 3 ? ' top3' : '';
 
       var metaParts = [];
       if (item.score > 0) metaParts.push('<span class="score-text">' + formatScore(item.score) + '</span>');
-      if (extra.num_comments) metaParts.push(formatScore(extra.num_comments) + ' comments');
-      if (extra.subreddit) metaParts.push('r/' + esc(extra.subreddit));
-      if (extra.author) metaParts.push('@' + esc(extra.author));
-      if (extra.comments) metaParts.push(formatScore(extra.comments) + ' comments');
-      metaParts.push(timeAgo(item.fetchedAt));
+
+      // Twitter 推文：显示互动数据
+      if (isTweet) {
+        if (extra.likes) metaParts.push('❤ ' + formatScore(extra.likes));
+        if (extra.retweets) metaParts.push('🔁 ' + formatScore(extra.retweets));
+        if (extra.views) metaParts.push('👁 ' + formatScore(extra.views));
+        if (extra.followers) metaParts.push(formatScore(extra.followers) + ' followers');
+      } else if (item.source === 'github') {
+        if (extra.language) metaParts.push('<span class="gh-lang">' + esc(extra.language) + '</span>');
+        if (extra.stars) metaParts.push('⭐ ' + formatScore(extra.stars));
+        if (extra.todayStars) metaParts.push('+' + formatScore(extra.todayStars) + ' today');
+      } else if (item.source === 'huggingface') {
+        if (extra.type === 'model') {
+          if (extra.pipeline) metaParts.push(esc(extra.pipeline));
+          if (extra.likes) metaParts.push('❤ ' + formatScore(extra.likes));
+        } else if (extra.type === 'paper') {
+          if (extra.upvotes) metaParts.push('👍 ' + extra.upvotes);
+        }
+      } else if (item.source === 'v2ex') {
+        if (extra.node) metaParts.push(esc(extra.node));
+        if (extra.replies) metaParts.push(extra.replies + ' 回复');
+        if (extra.author) metaParts.push('@' + esc(extra.author));
+      } else if (item.source === 'bingnews') {
+        if (extra.newsSource) metaParts.push(esc(extra.newsSource));
+      } else {
+        if (extra.num_comments) metaParts.push(formatScore(extra.num_comments) + ' comments');
+        if (extra.subreddit) metaParts.push('r/' + esc(extra.subreddit));
+        if (extra.author) metaParts.push('@' + esc(extra.author));
+        if (extra.comments) metaParts.push(formatScore(extra.comments) + ' comments');
+      }
+
+      // 优先用 publishedAt，没有则用 fetchedAt
+      var displayTime = item.publishedAt || item.fetchedAt;
+      metaParts.push(timeAgo(displayTime));
 
       var delay = Math.min(i * 30, 300);
 
@@ -188,7 +230,10 @@
 
   // === Render: Source filters ===
   function renderSourceFilters(sources) {
-    var labels = { google: 'Google', reddit: 'Reddit', hackernews: 'HN', duckduckgo: 'DDG', twitter: 'Twitter' };
+    var labels = {
+      google: 'Google', reddit: 'Reddit', hackernews: 'HN', duckduckgo: 'DDG',
+      twitter: 'Twitter', github: 'GitHub', huggingface: 'HF', v2ex: 'V2EX', bingnews: 'Bing News'
+    };
     var html = '<button class="pill' + (currentSource === 'all' ? ' active' : '') + '" data-source="all">全部</button>';
     sources.forEach(function (s) {
       html += '<button class="pill' + (currentSource === s ? ' active' : '') + '" data-source="' + s + '">'

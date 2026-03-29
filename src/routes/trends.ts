@@ -11,12 +11,20 @@ router.get('/trends', async (req: Request, res: Response) => {
   const source = req.query.source as string | undefined
   const skip = (page - 1) * limit
 
-  const where = source ? { source } : {}
+  const where: any = source ? { source } : {}
+
+  // 默认排除30天前的旧内容
+  const maxAgeDays = Math.min(90, Math.max(1, parseInt(req.query.days as string) || 30))
+  const since = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000)
+  where.OR = [
+    { publishedAt: { gte: since } },
+    { publishedAt: null, fetchedAt: { gte: since } },
+  ]
 
   const [items, total] = await Promise.all([
     prisma.trendItem.findMany({
       where,
-      orderBy: { fetchedAt: 'desc' },
+      orderBy: [{ score: 'desc' }, { fetchedAt: 'desc' }],
       skip,
       take: limit,
     }),

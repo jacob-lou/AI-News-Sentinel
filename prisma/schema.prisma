@@ -8,19 +8,21 @@ generator client {
 }
 
 model TrendItem {
-  id         Int      @id @default(autoincrement())
-  title      String
-  url        String?
-  source     String
-  score      Int      @default(0)
-  extra      String?
-  externalId String?
-  fetchedAt  DateTime @default(now())
-  createdAt  DateTime @default(now())
+  id          Int       @id @default(autoincrement())
+  title       String
+  url         String?
+  source      String
+  score       Int       @default(0)
+  extra       String?
+  externalId  String?
+  publishedAt DateTime?
+  fetchedAt   DateTime  @default(now())
+  createdAt   DateTime  @default(now())
 
   @@unique([source, externalId])
   @@index([source])
   @@index([fetchedAt])
+  @@index([publishedAt])
 }
 
 model FetchLog {

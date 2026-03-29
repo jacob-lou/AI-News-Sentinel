@@ -5,6 +5,7 @@ export interface TrendData {
   score: number
   extra?: string
   externalId: string
+  publishedAt?: Date
 }
 
 export interface SourceResult {
