@@ -116,7 +116,7 @@ router.get('/keywords/:id/alerts', async (req: Request, res: Response) => {
   res.json({ alerts })
 })
 
-// GET /api/keywords/:id/trends - 获取关键词范围内的热点
+// GET /api/keywords/:id/trends - 获取关键词范围内的热点（支持排序、筛选）
 router.get('/keywords/:id/trends', async (req: Request, res: Response) => {
   const id = parseInt(req.params.id)
   if (isNaN(id)) {
@@ -126,16 +126,55 @@ router.get('/keywords/:id/trends', async (req: Request, res: Response) => {
 
   const page = Math.max(1, parseInt(req.query.page as string) || 1)
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 30))
+  const sort = (req.query.sort as string) || 'fetchedAt'
+  const source = req.query.source as string | undefined
+  const search = (req.query.search as string || '').trim()
   const skip = (page - 1) * limit
+
+  const where: any = { keywordId: id }
+
+  // 来源筛选（支持逗号分隔多源）
+  if (source) {
+    const sources = source.split(',').map(s => s.trim()).filter(Boolean)
+    if (sources.length === 1) {
+      where.source = sources[0]
+    } else if (sources.length > 1) {
+      where.source = { in: sources }
+    }
+  }
+
+  // 标题搜索
+  if (search) {
+    where.title = { contains: search }
+  }
+
+  // 时间范围
+  const days = parseInt(req.query.days as string)
+  if (days > 0) {
+    const since = new Date(Date.now() - Math.min(days, 90) * 24 * 60 * 60 * 1000)
+    where.fetchedAt = { gte: since }
+  }
+
+  // 排序
+  let orderBy: any[]
+  switch (sort) {
+    case 'score':
+      orderBy = [{ score: 'desc' }, { fetchedAt: 'desc' }]
+      break
+    case 'fetchedAt':
+    default:
+      orderBy = [{ fetchedAt: 'desc' }]
+      break
+  }
 
   const [items, total] = await Promise.all([
     prisma.keywordTrend.findMany({
-      where: { keywordId: id },
-      orderBy: { fetchedAt: 'desc' },
+      where,
+      orderBy,
       skip,
       take: limit,
     }),
-    prisma.keywordTrend.count({ where: { keywordId: id } }),
+    prisma.keywordTrend.count({ where }),
   ])
 
   res.json({

@@ -1,5 +1,6 @@
 import prisma from '../db'
 import { TrendSource, TrendData, SourceResult } from '../sources/base'
+import { ClassifierService } from './classifier'
 import { GoogleTrendsSource } from '../sources/google'
 import { RedditSource } from '../sources/reddit'
 import { HackerNewsSource } from '../sources/hackernews'
@@ -13,6 +14,7 @@ import { BilibiliSource } from '../sources/bilibili'
 
 export class CollectorService {
   private sources: TrendSource[] = []
+  private classifier = new ClassifierService()
 
   constructor() {
     this.sources.push(new GoogleTrendsSource())
@@ -41,7 +43,10 @@ export class CollectorService {
       try {
         const items = await source.fetch()
         const duration = Date.now() - start
-        const saved = await this.saveItems(items)
+
+        // Classify items before saving
+        const categories = await this.classifier.classify(items)
+        const saved = await this.saveItems(items, categories)
 
         await prisma.fetchLog.create({
           data: {
@@ -82,11 +87,14 @@ export class CollectorService {
     return results
   }
 
-  private async saveItems(items: TrendData[]): Promise<TrendData[]> {
+  private async saveItems(items: TrendData[], categories: string[]): Promise<TrendData[]> {
     const saved: TrendData[] = []
 
-    for (const item of items) {
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx]
+      const category = categories[idx] || 'general'
       try {
+        const commentsCount = this.extractCommentsCount(item)
         await prisma.trendItem.upsert({
           where: {
             source_externalId: {
@@ -100,6 +108,8 @@ export class CollectorService {
             extra: item.extra,
             fetchedAt: new Date(),
             publishedAt: item.publishedAt,
+            commentsCount,
+            category,
           },
           create: {
             title: item.title,
@@ -109,6 +119,8 @@ export class CollectorService {
             extra: item.extra,
             externalId: item.externalId,
             publishedAt: item.publishedAt,
+            commentsCount,
+            category,
           },
         })
         saved.push(item)
@@ -118,5 +130,29 @@ export class CollectorService {
     }
 
     return saved
+  }
+
+  private extractCommentsCount(item: TrendData): number {
+    let extra: any = {}
+    try { extra = JSON.parse(item.extra || '{}') } catch {}
+
+    switch (item.source) {
+      case 'reddit':
+        return extra.num_comments || 0
+      case 'hackernews':
+        return extra.comments || 0
+      case 'v2ex':
+        return extra.replies || 0
+      case 'twitter':
+        return (extra.likes || 0) + (extra.retweets || 0)
+      case 'github':
+        return extra.todayStars || 0
+      case 'bilibili':
+        return extra.likes || 0
+      case 'huggingface':
+        return extra.likes || extra.upvotes || 0
+      default:
+        return 0
+    }
   }
 }

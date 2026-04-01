@@ -67,9 +67,76 @@
 
     <!-- ===== TRENDS TAB ===== -->
     <main id="trendsTab" class="tab-content active">
-      <div class="filter-row">
-        <div class="source-pills" id="sourceFilters">
-          <button class="pill active" data-source="all">全部</button>
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="toolbar-row">
+          <div class="search-box">
+            <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="aiSearch" class="search-input" placeholder="搜索标题…" maxlength="100" />
+          </div>
+          <div class="toolbar-controls">
+            <div class="dropdown" id="aiSortDropdown">
+              <button class="dropdown-trigger" data-value="score">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                <span>最热</span>
+              </button>
+              <div class="dropdown-menu">
+                <button class="dropdown-item active" data-value="score">最热</button>
+                <button class="dropdown-item" data-value="newest">最新</button>
+                <button class="dropdown-item" data-value="comments">最多互动</button>
+                <button class="dropdown-item" data-value="fetchedAt">最新采集</button>
+              </div>
+            </div>
+            <div class="dropdown multi" id="aiSourceDropdown">
+              <button class="dropdown-trigger">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                <span>数据源</span>
+              </button>
+              <div class="dropdown-menu" id="aiSourceMenu"></div>
+            </div>
+            <button id="aiMoreFilters" class="btn btn-ghost btn-sm filter-toggle">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/></svg>
+              筛选
+            </button>
+          </div>
+        </div>
+        <div class="toolbar-extra" id="aiFiltersPanel" style="display:none;">
+          <div class="filter-group">
+            <label class="filter-label">时间</label>
+            <div class="time-pills" id="aiTimePills">
+              <button class="pill-sm active" data-days="30">30天</button>
+              <button class="pill-sm" data-days="1">今天</button>
+              <button class="pill-sm" data-days="3">3天</button>
+              <button class="pill-sm" data-days="7">7天</button>
+              <button class="pill-sm" data-days="90">90天</button>
+            </div>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">热度</label>
+            <div class="time-pills" id="aiScorePills">
+              <button class="pill-sm active" data-score="0">不限</button>
+              <button class="pill-sm" data-score="50">中热度</button>
+              <button class="pill-sm" data-score="200">高热度</button>
+            </div>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">选项</label>
+            <div class="filter-options">
+              <label class="toggle-label"><input type="checkbox" id="aiHasUrl" /> 仅有链接</label>
+              <div class="page-size-group">
+                <span>每页</span>
+                <select id="aiPageSize" class="select-sm">
+                  <option value="20">20</option>
+                  <option value="50" selected>50</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
+              <button id="compactToggle" class="btn btn-ghost btn-sm" title="紧凑/宽松模式">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                紧凑
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -104,9 +171,72 @@
 
     <!-- ===== GENERAL TRENDS TAB ===== -->
     <main id="generalTab" class="tab-content" style="display:none;">
-      <div class="filter-row">
-        <div class="source-pills" id="generalSourceFilters">
-          <button class="pill active" data-source="all">全部</button>
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="toolbar-row">
+          <div class="search-box">
+            <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="generalSearch" class="search-input" placeholder="搜索标题…" maxlength="100" />
+          </div>
+          <div class="toolbar-controls">
+            <div class="dropdown" id="generalSortDropdown">
+              <button class="dropdown-trigger" data-value="score">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                <span>最热</span>
+              </button>
+              <div class="dropdown-menu">
+                <button class="dropdown-item active" data-value="score">最热</button>
+                <button class="dropdown-item" data-value="newest">最新</button>
+                <button class="dropdown-item" data-value="comments">最多互动</button>
+                <button class="dropdown-item" data-value="fetchedAt">最新采集</button>
+              </div>
+            </div>
+            <div class="dropdown multi" id="generalSourceDropdown">
+              <button class="dropdown-trigger">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                <span>数据源</span>
+              </button>
+              <div class="dropdown-menu" id="generalSourceMenu"></div>
+            </div>
+            <button id="generalMoreFilters" class="btn btn-ghost btn-sm filter-toggle">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/></svg>
+              筛选
+            </button>
+          </div>
+        </div>
+        <div class="toolbar-extra" id="generalFiltersPanel" style="display:none;">
+          <div class="filter-group">
+            <label class="filter-label">时间</label>
+            <div class="time-pills" id="generalTimePills">
+              <button class="pill-sm active" data-days="30">30天</button>
+              <button class="pill-sm" data-days="1">今天</button>
+              <button class="pill-sm" data-days="3">3天</button>
+              <button class="pill-sm" data-days="7">7天</button>
+              <button class="pill-sm" data-days="90">90天</button>
+            </div>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">热度</label>
+            <div class="time-pills" id="generalScorePills">
+              <button class="pill-sm active" data-score="0">不限</button>
+              <button class="pill-sm" data-score="50">中热度</button>
+              <button class="pill-sm" data-score="200">高热度</button>
+            </div>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">选项</label>
+            <div class="filter-options">
+              <label class="toggle-label"><input type="checkbox" id="generalHasUrl" /> 仅有链接</label>
+              <div class="page-size-group">
+                <span>每页</span>
+                <select id="generalPageSize" class="select-sm">
+                  <option value="20">20</option>
+                  <option value="50" selected>50</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -162,7 +292,27 @@
           <button class="detail-tab-btn" data-dtab="ktrends">热点</button>
         </div>
         <div id="detailAlerts" class="detail-body"></div>
-        <div id="detailTrends" class="detail-body" style="display:none;"></div>
+        <div id="detailTrends" class="detail-body" style="display:none;">
+          <div class="detail-toolbar">
+            <div class="dropdown" id="kwSortDropdown">
+              <button class="dropdown-trigger" data-value="fetchedAt">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                <span>按时间</span>
+              </button>
+              <div class="dropdown-menu">
+                <button class="dropdown-item active" data-value="fetchedAt">按时间</button>
+                <button class="dropdown-item" data-value="score">按热度</button>
+              </div>
+            </div>
+            <div class="time-pills" id="kwTimePills">
+              <button class="pill-sm active" data-days="0">全部</button>
+              <button class="pill-sm" data-days="1">今天</button>
+              <button class="pill-sm" data-days="7">7天</button>
+              <button class="pill-sm" data-days="30">30天</button>
+            </div>
+          </div>
+          <div id="detailTrendsInner"></div>
+        </div>
       </div>
 
       <div class="section-block">

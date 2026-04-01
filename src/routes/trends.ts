@@ -1,37 +1,59 @@
 import { Router, Request, Response } from 'express'
 import prisma from '../db'
 import { AnalysisService } from '../services/analysis'
+import { ClassifierService } from '../services/classifier'
 
 const router = Router()
 
-// GET /api/trends - 获取热点列表（分页、筛选来源、分类）
+// GET /api/trends - 获取热点列表（分页、筛选来源、分类、排序、搜索）
 router.get('/trends', async (req: Request, res: Response) => {
   const page = Math.max(1, parseInt(req.query.page as string) || 1)
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50))
   const source = req.query.source as string | undefined
   const category = req.query.category as string | undefined
+  const sort = (req.query.sort as string) || 'score'
+  const search = (req.query.search as string || '').trim()
+  const minScore = parseInt(req.query.minScore as string) || 0
+  const hasUrl = req.query.hasUrl === 'true'
   const skip = (page - 1) * limit
 
-  // AI 相关数据源
-  const AI_SOURCES = ['github', 'huggingface', 'hackernews', 'twitter', 'bingnews']
-  // 综合数据源
-  const GENERAL_SOURCES = ['google', 'reddit', 'duckduckgo', 'v2ex', 'bilibili']
+  // AI 相关数据源 — now uses DB category field
+  // const AI_SOURCES = ['github', 'huggingface', 'hackernews', 'twitter', 'bingnews']
+  // const GENERAL_SOURCES = ['google', 'reddit', 'duckduckgo', 'v2ex', 'bilibili']
 
   const where: any = {}
 
-  // 按分类筛选
-  if (category === 'ai') {
-    where.source = { in: AI_SOURCES }
-  } else if (category === 'general') {
-    where.source = { in: GENERAL_SOURCES }
+  // 按分类筛选（基于 category 字段）
+  if (category === 'ai' || category === 'general') {
+    where.category = category
   }
 
-  // 再叠加单个来源筛选
+  // 来源筛选（支持逗号分隔多源）
   if (source) {
-    where.source = source
+    const sources = source.split(',').map(s => s.trim()).filter(Boolean)
+    if (sources.length === 1) {
+      where.source = sources[0]
+    } else if (sources.length > 1) {
+      where.source = { in: sources }
+    }
   }
 
-  // 默认排除30天前的旧内容
+  // 标题搜索
+  if (search) {
+    where.title = { contains: search }
+  }
+
+  // 热度门槛
+  if (minScore > 0) {
+    where.score = { gte: minScore }
+  }
+
+  // 仅有链接
+  if (hasUrl) {
+    where.url = { not: null }
+  }
+
+  // 默认排除N天前的旧内容
   const maxAgeDays = Math.min(90, Math.max(1, parseInt(req.query.days as string) || 30))
   const since = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000)
   where.OR = [
@@ -39,10 +61,28 @@ router.get('/trends', async (req: Request, res: Response) => {
     { publishedAt: null, fetchedAt: { gte: since } },
   ]
 
+  // 排序
+  let orderBy: any[]
+  switch (sort) {
+    case 'newest':
+      orderBy = [{ publishedAt: { sort: 'desc', nulls: 'last' } }, { fetchedAt: 'desc' }]
+      break
+    case 'comments':
+      orderBy = [{ commentsCount: 'desc' }, { score: 'desc' }]
+      break
+    case 'fetchedAt':
+      orderBy = [{ fetchedAt: 'desc' }]
+      break
+    case 'score':
+    default:
+      orderBy = [{ score: 'desc' }, { fetchedAt: 'desc' }]
+      break
+  }
+
   const [items, total] = await Promise.all([
     prisma.trendItem.findMany({
       where,
-      orderBy: [{ score: 'desc' }, { fetchedAt: 'desc' }],
+      orderBy,
       skip,
       take: limit,
     }),
@@ -60,9 +100,16 @@ router.get('/trends', async (req: Request, res: Response) => {
   })
 })
 
-// GET /api/trends/sources - 获取所有来源
-router.get('/trends/sources', async (_req: Request, res: Response) => {
+// GET /api/trends/sources - 获取来源（支持按分类筛选）
+router.get('/trends/sources', async (req: Request, res: Response) => {
+  const category = req.query.category as string | undefined
+  const where: any = {}
+  if (category === 'ai' || category === 'general') {
+    where.category = category
+  }
+
   const sources = await prisma.trendItem.findMany({
+    where,
     select: { source: true },
     distinct: ['source'],
   })
@@ -137,6 +184,19 @@ router.post('/trends/analyze', async (_req: Request, res: Response) => {
   const io = getIO()
   if (io && result) {
     io.emit('analysis-update', { analysis: result, timestamp: new Date().toISOString() })
+  }
+})
+
+// POST /api/trends/backfill-categories - 重新分类所有现有数据
+router.post('/trends/backfill-categories', async (_req: Request, res: Response) => {
+  const classifier = new ClassifierService()
+  res.json({ message: 'Backfill started' })
+
+  try {
+    const result = await classifier.backfill()
+    console.log(`[Backfill] Done: ${result.total} processed, ${result.aiCount} classified as AI`)
+  } catch (err: any) {
+    console.error('[Backfill] Failed:', err?.message || err)
   }
 })
 

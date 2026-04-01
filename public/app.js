@@ -2,16 +2,25 @@
   'use strict';
 
   const socket = io();
-  let currentSource = 'all';
-  let currentPage = 1;
-  let currentCategory = 'ai'; // 'ai' | 'general'
-  const PAGE_SIZE = 50;
-  let currentDetailKeywordId = null;
   let alertCount = 0;
+  let currentDetailKeywordId = null;
 
-  // Elements — AI Trends
+  // === Filter state per tab ===
+  const aiState = {
+    page: 1, pageSize: 50, sort: 'score', sources: [], search: '',
+    days: 30, minScore: 0, hasUrl: false,
+  };
+  const generalState = {
+    page: 1, pageSize: 50, sort: 'score', sources: [], search: '',
+    days: 30, minScore: 0, hasUrl: false,
+  };
+  const kwState = { sort: 'fetchedAt', days: 0 };
+
+  // Compact mode
+  let isCompact = localStorage.getItem('compact') === 'true';
+
+  // === DOM refs ===
   const trendsList = document.getElementById('trendsList');
-  const sourceFilters = document.getElementById('sourceFilters');
   const refreshBtn = document.getElementById('refreshBtn');
   const analyzeBtn = document.getElementById('analyzeBtn');
   const statusEl = document.getElementById('status');
@@ -22,20 +31,14 @@
   const analysisTopics = document.getElementById('analysisTopics');
   const analysisTime = document.getElementById('analysisTime');
 
-  // Elements — General Trends
   const generalTrendsList = document.getElementById('generalTrendsList');
-  const generalSourceFilters = document.getElementById('generalSourceFilters');
   const generalPaginationEl = document.getElementById('generalPagination');
-  let generalSource = 'all';
-  let generalPage = 1;
 
-  // Elements — Tabs
   const tabBtns = document.querySelectorAll('.tab-item');
   const trendsTab = document.getElementById('trendsTab');
   const generalTab = document.getElementById('generalTab');
   const keywordsTab = document.getElementById('keywordsTab');
 
-  // Elements — Keywords
   const keywordInput = document.getElementById('keywordInput');
   const scopeInput = document.getElementById('scopeInput');
   const addKeywordBtn = document.getElementById('addKeywordBtn');
@@ -47,13 +50,129 @@
   const closeDetail = document.getElementById('closeDetail');
   const detailAlerts = document.getElementById('detailAlerts');
   const detailTrends = document.getElementById('detailTrends');
+  const detailTrendsInner = document.getElementById('detailTrendsInner');
   const recentAlertsEl = document.getElementById('recentAlerts');
 
-  // Elements — Alert banner
   const alertBanner = document.getElementById('alertBanner');
   const alertText = document.getElementById('alertText');
   const alertDismiss = document.getElementById('alertDismiss');
   const alertCountEl = document.getElementById('alertCount');
+
+  // Source labels
+  const sourceLabels = {
+    google: 'Google', reddit: 'Reddit', hackernews: 'HN', duckduckgo: 'DDG',
+    twitter: 'Twitter', github: 'GitHub', huggingface: 'HF', v2ex: 'V2EX',
+    bingnews: 'Bing News', bilibili: 'B站',
+  };
+
+  // === Compact mode init ===
+  if (isCompact) document.body.classList.add('compact');
+
+  // === Generic dropdown logic ===
+  function initDropdown(container, onChange) {
+    if (!container) return;
+    var trigger = container.querySelector('.dropdown-trigger');
+    var menu = container.querySelector('.dropdown-menu');
+    trigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      closeAllDropdowns();
+      container.classList.toggle('open');
+    });
+    menu.addEventListener('click', function (e) {
+      var item = e.target.closest('.dropdown-item');
+      if (!item) return;
+      if (container.classList.contains('multi')) {
+        // multi-select: toggle checkbox
+        var cb = item.querySelector('input[type="checkbox"]');
+        if (cb && e.target !== cb) cb.checked = !cb.checked;
+        if (onChange) onChange();
+      } else {
+        // single-select
+        menu.querySelectorAll('.dropdown-item').forEach(function (b) { b.classList.remove('active'); });
+        item.classList.add('active');
+        trigger.dataset.value = item.dataset.value;
+        trigger.querySelector('span').textContent = item.textContent.trim();
+        container.classList.remove('open');
+        if (onChange) onChange(item.dataset.value);
+      }
+    });
+  }
+
+  function closeAllDropdowns() {
+    document.querySelectorAll('.dropdown.open').forEach(function (d) { d.classList.remove('open'); });
+  }
+  document.addEventListener('click', closeAllDropdowns);
+
+  // === Multi-select source dropdown renderer ===
+  function renderSourceMenu(menuEl, sources, state) {
+    var html = '<label class="dropdown-item select-all"><input type="checkbox" checked /> 全选</label>';
+    sources.forEach(function (s) {
+      var checked = state.sources.length === 0 || state.sources.indexOf(s) !== -1;
+      html += '<label class="dropdown-item"><input type="checkbox" value="' + s + '"' + (checked ? ' checked' : '') + ' /> ' + (sourceLabels[s] || s) + '</label>';
+    });
+    menuEl.innerHTML = html;
+
+    // select-all logic
+    var selectAll = menuEl.querySelector('.select-all input');
+    var boxes = menuEl.querySelectorAll('input[value]');
+    selectAll.addEventListener('change', function () {
+      boxes.forEach(function (cb) { cb.checked = selectAll.checked; });
+    });
+    boxes.forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        selectAll.checked = Array.from(boxes).every(function (b) { return b.checked; });
+      });
+    });
+  }
+
+  function getSelectedSources(menuEl) {
+    var boxes = menuEl.querySelectorAll('input[value]');
+    var all = [];
+    var selected = [];
+    boxes.forEach(function (cb) {
+      all.push(cb.value);
+      if (cb.checked) selected.push(cb.value);
+    });
+    // if all selected, return [] (means "all")
+    return selected.length === all.length ? [] : selected;
+  }
+
+  // === Pill-based filter logic ===
+  function initPills(container, callback) {
+    if (!container) return;
+    container.addEventListener('click', function (e) {
+      var btn = e.target.closest('.pill-sm');
+      if (!btn) return;
+      container.querySelectorAll('.pill-sm').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      if (callback) callback(btn);
+    });
+  }
+
+  // === Debounced search ===
+  function debounce(fn, ms) {
+    var timer;
+    return function () {
+      clearTimeout(timer);
+      timer = setTimeout(fn, ms);
+    };
+  }
+
+  // === Build query params ===
+  function buildTrendParams(state, category) {
+    var params = new URLSearchParams({
+      page: String(state.page),
+      limit: String(state.pageSize),
+      category: category,
+      sort: state.sort,
+      days: String(state.days),
+    });
+    if (state.sources.length > 0) params.set('source', state.sources.join(','));
+    if (state.search) params.set('search', state.search);
+    if (state.minScore > 0) params.set('minScore', String(state.minScore));
+    if (state.hasUrl) params.set('hasUrl', 'true');
+    return params;
+  }
 
   // === Tab switching ===
   tabBtns.forEach(function (btn) {
@@ -68,11 +187,9 @@
       keywordsTab.style.display = tab === 'keywords' ? '' : 'none';
       keywordsTab.classList.toggle('active', tab === 'keywords');
       if (tab === 'trends') {
-        currentCategory = 'ai';
         loadTrends();
         loadSources('ai');
       } else if (tab === 'general') {
-        currentCategory = 'general';
         loadGeneralTrends();
         loadSources('general');
       } else if (tab === 'keywords') {
@@ -82,54 +199,38 @@
     });
   });
 
-  // === Load data ===
-  async function loadTrends() {
-    var params = new URLSearchParams({
-      page: String(currentPage),
-      limit: String(PAGE_SIZE),
-      category: 'ai',
-    });
-    if (currentSource !== 'all') params.set('source', currentSource);
-
-    trendsList.innerHTML = '<div class="skeleton-group">'
+  // === Data loaders ===
+  function showSkeleton(container) {
+    container.innerHTML = '<div class="skeleton-group">'
       + '<div class="skeleton-line w80"></div>'
       + '<div class="skeleton-line w60"></div>'
       + '<div class="skeleton-line w80"></div>'
       + '<div class="skeleton-line w40"></div>'
       + '<div class="skeleton-line w80"></div>'
       + '</div>';
+  }
 
+  async function loadTrends() {
+    var params = buildTrendParams(aiState, 'ai');
+    showSkeleton(trendsList);
     try {
       var res = await fetch('/api/trends?' + params.toString());
       var data = await res.json();
-      renderTrends(data.items, trendsList, currentPage);
-      renderPagination(data.pagination, paginationEl, function (p) { currentPage = p; loadTrends(); });
+      renderTrends(data.items, trendsList, aiState.page, aiState.pageSize);
+      renderPagination(data.pagination, paginationEl, function (p) { aiState.page = p; loadTrends(); });
     } catch {
       trendsList.innerHTML = '<div class="empty-state">加载失败，请刷新重试</div>';
     }
   }
 
   async function loadGeneralTrends() {
-    var params = new URLSearchParams({
-      page: String(generalPage),
-      limit: String(PAGE_SIZE),
-      category: 'general',
-    });
-    if (generalSource !== 'all') params.set('source', generalSource);
-
-    generalTrendsList.innerHTML = '<div class="skeleton-group">'
-      + '<div class="skeleton-line w80"></div>'
-      + '<div class="skeleton-line w60"></div>'
-      + '<div class="skeleton-line w80"></div>'
-      + '<div class="skeleton-line w40"></div>'
-      + '<div class="skeleton-line w80"></div>'
-      + '</div>';
-
+    var params = buildTrendParams(generalState, 'general');
+    showSkeleton(generalTrendsList);
     try {
       var res = await fetch('/api/trends?' + params.toString());
       var data = await res.json();
-      renderTrends(data.items, generalTrendsList, generalPage);
-      renderPagination(data.pagination, generalPaginationEl, function (p) { generalPage = p; loadGeneralTrends(); });
+      renderTrends(data.items, generalTrendsList, generalState.page, generalState.pageSize);
+      renderPagination(data.pagination, generalPaginationEl, function (p) { generalState.page = p; loadGeneralTrends(); });
     } catch {
       generalTrendsList.innerHTML = '<div class="empty-state">加载失败，请刷新重试</div>';
     }
@@ -137,16 +238,12 @@
 
   async function loadSources(category) {
     try {
-      var res = await fetch('/api/trends/sources');
+      var res = await fetch('/api/trends/sources?category=' + encodeURIComponent(category));
       var data = await res.json();
-      var aiSources = ['github', 'huggingface', 'hackernews', 'twitter', 'bingnews'];
-      var generalSources = ['google', 'reddit', 'duckduckgo', 'v2ex', 'bilibili'];
       if (category === 'general') {
-        var filtered = data.sources.filter(function (s) { return generalSources.indexOf(s) !== -1; });
-        renderSourceFilters(filtered, generalSourceFilters, generalSource);
+        renderSourceMenu(document.getElementById('generalSourceMenu'), data.sources, generalState);
       } else {
-        var filtered = data.sources.filter(function (s) { return aiSources.indexOf(s) !== -1; });
-        renderSourceFilters(filtered, sourceFilters, currentSource);
+        renderSourceMenu(document.getElementById('aiSourceMenu'), data.sources, aiState);
       }
     } catch {}
   }
@@ -190,19 +287,22 @@
   }
 
   async function loadKeywordTrends(kwId) {
+    var params = new URLSearchParams({ sort: kwState.sort });
+    if (kwState.days > 0) params.set('days', String(kwState.days));
     try {
-      var res = await fetch('/api/keywords/' + kwId + '/trends');
+      var res = await fetch('/api/keywords/' + kwId + '/trends?' + params.toString());
       var data = await res.json();
       renderDetailTrends(data.items);
     } catch {
-      detailTrends.innerHTML = '<div class="empty-state">加载失败</div>';
+      detailTrendsInner.innerHTML = '<div class="empty-state">加载失败</div>';
     }
   }
 
   // === Render: Trends ===
-  function renderTrends(items, container, page) {
+  function renderTrends(items, container, page, pageSize) {
     if (!container) container = trendsList;
-    if (!page) page = currentPage;
+    if (!page) page = 1;
+    if (!pageSize) pageSize = 50;
     if (!items || items.length === 0) {
       container.innerHTML = '<div class="empty-state">暂无数据，等待首次采集…</div>';
       return;
@@ -229,7 +329,7 @@
           : esc(item.title);
       }
 
-      var rankNum = (page - 1) * PAGE_SIZE + i + 1;
+      var rankNum = (page - 1) * pageSize + i + 1;
       var rankCls = rankNum <= 3 ? ' top3' : '';
 
       var metaParts = [];
@@ -292,27 +392,10 @@
     }).join('');
   }
 
-  // === Render: Source filters ===
-  function renderSourceFilters(sources, container, activeSource) {
-    if (!container) container = sourceFilters;
-    if (!activeSource) activeSource = currentSource;
-    var labels = {
-      google: 'Google', reddit: 'Reddit', hackernews: 'HN', duckduckgo: 'DDG',
-      twitter: 'Twitter', github: 'GitHub', huggingface: 'HF', v2ex: 'V2EX', bingnews: 'Bing News',
-      bilibili: 'B站'
-    };
-    var html = '<button class="pill' + (activeSource === 'all' ? ' active' : '') + '" data-source="all">全部</button>';
-    sources.forEach(function (s) {
-      html += '<button class="pill' + (activeSource === s ? ' active' : '') + '" data-source="' + s + '">'
-        + (labels[s] || s) + '</button>';
-    });
-    container.innerHTML = html;
-  }
-
   // === Render: Pagination ===
   function renderPagination(pagination, container, onPageChange) {
     if (!container) container = paginationEl;
-    var activePage = container === generalPaginationEl ? generalPage : currentPage;
+    var activePage = pagination.page || 1;
     if (!pagination || pagination.totalPages <= 1) {
       container.innerHTML = '';
       return;
@@ -403,11 +486,12 @@
 
   // === Render: Detail trends ===
   function renderDetailTrends(items) {
+    var target = detailTrendsInner || detailTrends;
     if (!items || items.length === 0) {
-      detailTrends.innerHTML = '<div class="empty-state">暂无相关热点</div>';
+      target.innerHTML = '<div class="empty-state">暂无相关热点</div>';
       return;
     }
-    detailTrends.innerHTML = items.map(function (item, i) {
+    target.innerHTML = items.map(function (item, i) {
       var titleHtml = item.url
         ? '<a href="' + esc(item.url) + '" target="_blank" rel="noopener">' + esc(item.title) + '</a>'
         : esc(item.title);
@@ -551,31 +635,105 @@
     }
   });
 
-  // === Source filter clicks ===
-  sourceFilters.addEventListener('click', function (e) {
-    if (e.target.classList.contains('pill')) {
-      currentSource = e.target.dataset.source;
-      currentPage = 1;
-      loadTrends();
-      loadSources('ai');
-    }
+  // === Toolbar initialization ===
+
+  // AI Tab toolbar
+  var aiSearchInput = document.getElementById('aiSearch');
+  var aiSortDropdown = document.getElementById('aiSortDropdown');
+  var aiSourceDropdown = document.getElementById('aiSourceDropdown');
+  var aiMoreFilters = document.getElementById('aiMoreFilters');
+  var aiFiltersPanel = document.getElementById('aiFiltersPanel');
+  var aiTimePills = document.getElementById('aiTimePills');
+  var aiScorePills = document.getElementById('aiScorePills');
+  var aiHasUrl = document.getElementById('aiHasUrl');
+  var aiPageSizeEl = document.getElementById('aiPageSize');
+  var compactToggle = document.getElementById('compactToggle');
+
+  function reloadAi() { aiState.page = 1; loadTrends(); }
+
+  initDropdown(aiSortDropdown, function (val) { aiState.sort = val; reloadAi(); });
+  initDropdown(aiSourceDropdown, function () {
+    aiState.sources = getSelectedSources(document.getElementById('aiSourceMenu'));
+    reloadAi();
   });
 
-  generalSourceFilters.addEventListener('click', function (e) {
-    if (e.target.classList.contains('pill')) {
-      generalSource = e.target.dataset.source;
-      generalPage = 1;
-      loadGeneralTrends();
-      loadSources('general');
-    }
+  aiSearchInput.addEventListener('input', debounce(function () {
+    aiState.search = aiSearchInput.value.trim();
+    reloadAi();
+  }, 300));
+  aiSearchInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { aiState.search = aiSearchInput.value.trim(); reloadAi(); }
   });
 
-  paginationEl.addEventListener('click', function (e) {
-    if (e.target.tagName === 'BUTTON' && e.target.dataset.page) {
-      currentPage = parseInt(e.target.dataset.page);
-      loadTrends();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+  aiMoreFilters.addEventListener('click', function () {
+    var panel = aiFiltersPanel;
+    var show = panel.style.display === 'none';
+    panel.style.display = show ? '' : 'none';
+    aiMoreFilters.classList.toggle('active', show);
+  });
+
+  initPills(aiTimePills, function (btn) { aiState.days = parseInt(btn.dataset.days) || 30; reloadAi(); });
+  initPills(aiScorePills, function (btn) { aiState.minScore = parseInt(btn.dataset.score) || 0; reloadAi(); });
+  aiHasUrl.addEventListener('change', function () { aiState.hasUrl = aiHasUrl.checked; reloadAi(); });
+  aiPageSizeEl.addEventListener('change', function () { aiState.pageSize = parseInt(aiPageSizeEl.value) || 50; reloadAi(); });
+
+  // Compact mode toggle
+  compactToggle.addEventListener('click', function () {
+    isCompact = !isCompact;
+    document.body.classList.toggle('compact', isCompact);
+    localStorage.setItem('compact', isCompact);
+  });
+
+  // General Tab toolbar
+  var generalSearchInput = document.getElementById('generalSearch');
+  var generalSortDropdown = document.getElementById('generalSortDropdown');
+  var generalSourceDropdown = document.getElementById('generalSourceDropdown');
+  var generalMoreFilters = document.getElementById('generalMoreFilters');
+  var generalFiltersPanel = document.getElementById('generalFiltersPanel');
+  var generalTimePills = document.getElementById('generalTimePills');
+  var generalScorePills = document.getElementById('generalScorePills');
+  var generalHasUrl = document.getElementById('generalHasUrl');
+  var generalPageSizeEl = document.getElementById('generalPageSize');
+
+  function reloadGeneral() { generalState.page = 1; loadGeneralTrends(); }
+
+  initDropdown(generalSortDropdown, function (val) { generalState.sort = val; reloadGeneral(); });
+  initDropdown(generalSourceDropdown, function () {
+    generalState.sources = getSelectedSources(document.getElementById('generalSourceMenu'));
+    reloadGeneral();
+  });
+
+  generalSearchInput.addEventListener('input', debounce(function () {
+    generalState.search = generalSearchInput.value.trim();
+    reloadGeneral();
+  }, 300));
+  generalSearchInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { generalState.search = generalSearchInput.value.trim(); reloadGeneral(); }
+  });
+
+  generalMoreFilters.addEventListener('click', function () {
+    var panel = generalFiltersPanel;
+    var show = panel.style.display === 'none';
+    panel.style.display = show ? '' : 'none';
+    generalMoreFilters.classList.toggle('active', show);
+  });
+
+  initPills(generalTimePills, function (btn) { generalState.days = parseInt(btn.dataset.days) || 30; reloadGeneral(); });
+  initPills(generalScorePills, function (btn) { generalState.minScore = parseInt(btn.dataset.score) || 0; reloadGeneral(); });
+  generalHasUrl.addEventListener('change', function () { generalState.hasUrl = generalHasUrl.checked; reloadGeneral(); });
+  generalPageSizeEl.addEventListener('change', function () { generalState.pageSize = parseInt(generalPageSizeEl.value) || 50; reloadGeneral(); });
+
+  // Keywords detail toolbar
+  var kwSortDropdown = document.getElementById('kwSortDropdown');
+  var kwTimePills = document.getElementById('kwTimePills');
+
+  initDropdown(kwSortDropdown, function (val) {
+    kwState.sort = val;
+    if (currentDetailKeywordId) loadKeywordTrends(currentDetailKeywordId);
+  });
+  initPills(kwTimePills, function (btn) {
+    kwState.days = parseInt(btn.dataset.days) || 0;
+    if (currentDetailKeywordId) loadKeywordTrends(currentDetailKeywordId);
   });
 
   refreshBtn.addEventListener('click', async function () {
@@ -608,10 +766,8 @@
   socket.on('new-trends', function (data) {
     statusEl.textContent = '新数据 ' + data.items.length + ' 条';
     statusEl.className = 'conn-badge online';
-    loadTrends();
-    loadGeneralTrends();
-    loadSources('ai');
-    loadSources('general');
+    if (trendsTab.classList.contains('active')) { loadTrends(); loadSources('ai'); }
+    if (generalTab.classList.contains('active')) { loadGeneralTrends(); loadSources('general'); }
   });
 
   socket.on('fetch-status', function (data) {

@@ -8,21 +8,37 @@ generator client {
 }
 
 model TrendItem {
-  id          Int       @id @default(autoincrement())
-  title       String
-  url         String?
-  source      String
-  score       Int       @default(0)
-  extra       String?
-  externalId  String?
-  publishedAt DateTime?
-  fetchedAt   DateTime  @default(now())
-  createdAt   DateTime  @default(now())
+  id            Int       @id @default(autoincrement())
+  title         String
+  url           String?
+  source        String
+  score         Int       @default(0)
+  commentsCount Int       @default(0)
+  category      String    @default("general")
+  extra         String?
+  externalId    String?
+  publishedAt   DateTime?
+  fetchedAt     DateTime  @default(now())
+  createdAt     DateTime  @default(now())
 
   @@unique([source, externalId])
   @@index([source])
   @@index([fetchedAt])
   @@index([publishedAt])
+  @@index([commentsCount])
+  @@index([category])
+}
+
+model CategoryRule {
+  id        Int      @id @default(autoincrement())
+  keyword   String
+  category  String   @default("ai")
+  weight    Int      @default(1)
+  isRegex   Boolean  @default(false)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([keyword, category])
 }
 
 model FetchLog {
