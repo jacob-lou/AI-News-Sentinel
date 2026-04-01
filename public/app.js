@@ -192,6 +192,7 @@
       } else if (tab === 'general') {
         loadGeneralTrends();
         loadSources('general');
+        loadAnalysis();
       } else if (tab === 'keywords') {
         loadKeywords();
         loadRecentAlerts();
@@ -252,7 +253,10 @@
     try {
       var res = await fetch('/api/trends/analysis');
       var data = await res.json();
-      if (data.analysis) renderAnalysis(data.analysis);
+      if (data.analysis) {
+        renderAnalysis(data.analysis);
+        renderAnalysis(data.analysis, 'general');
+      }
       if (!data.configured) analyzeBtn.style.display = 'none';
     } catch {}
   }
@@ -422,13 +426,26 @@
   }
 
   // === Render: AI Analysis ===
-  function renderAnalysis(data) {
-    analysisPanel.style.display = '';
-    analysisSummary.textContent = data.summary || '';
-    if (data.createdAt) analysisTime.textContent = timeAgo(data.createdAt);
+  function renderAnalysis(data, target) {
+    var panel, summary, time, topicsEl;
+    if (target === 'general') {
+      panel = document.getElementById('generalAnalysisPanel');
+      summary = document.getElementById('generalAnalysisSummary');
+      time = document.getElementById('generalAnalysisTime');
+      topicsEl = document.getElementById('generalAnalysisTopics');
+    } else {
+      panel = analysisPanel;
+      summary = analysisSummary;
+      time = analysisTime;
+      topicsEl = analysisTopics;
+    }
+    if (!panel) return;
+    panel.style.display = '';
+    summary.textContent = data.summary || '';
+    if (data.createdAt) time.textContent = timeAgo(data.createdAt);
 
     var topics = data.topics || [];
-    analysisTopics.innerHTML = topics.map(function (t) {
+    topicsEl.innerHTML = topics.map(function (t) {
       var heat = t.heat || 'medium';
       var sources = (t.sources || []).join(', ');
       return '<span class="chip ' + heat + '" title="' + esc(t.description || '') + ' (' + esc(sources) + ')">'
@@ -782,6 +799,7 @@
   socket.on('analysis-update', function (data) {
     if (data.analysis) {
       renderAnalysis(data.analysis);
+      renderAnalysis(data.analysis, 'general');
       analyzeBtn.disabled = false;
     }
   });

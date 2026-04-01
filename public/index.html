@@ -82,7 +82,8 @@
               </button>
               <div class="dropdown-menu">
                 <button class="dropdown-item active" data-value="score">最热</button>
-                <button class="dropdown-item" data-value="newest">最新</button>
+                <button class="dropdown-item" data-value="importance">重要程度</button>
+                <button class="dropdown-item" data-value="newest">最新发布</button>
                 <button class="dropdown-item" data-value="comments">最多互动</button>
                 <button class="dropdown-item" data-value="fetchedAt">最新采集</button>
               </div>
@@ -186,7 +187,8 @@
               </button>
               <div class="dropdown-menu">
                 <button class="dropdown-item active" data-value="score">最热</button>
-                <button class="dropdown-item" data-value="newest">最新</button>
+                <button class="dropdown-item" data-value="importance">重要程度</button>
+                <button class="dropdown-item" data-value="newest">最新发布</button>
                 <button class="dropdown-item" data-value="comments">最多互动</button>
                 <button class="dropdown-item" data-value="fetchedAt">最新采集</button>
               </div>
@@ -237,6 +239,22 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- AI Analysis for General tab -->
+      <div id="generalAnalysisPanel" class="analysis-card" style="display:none;">
+        <div class="glow-border" aria-hidden="true"></div>
+        <div class="analysis-inner">
+          <div class="analysis-head">
+            <span class="analysis-label">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              AI 趋势分析
+            </span>
+            <span id="generalAnalysisTime" class="meta-text"></span>
+          </div>
+          <p id="generalAnalysisSummary" class="analysis-body"></p>
+          <div id="generalAnalysisTopics" class="topic-chips"></div>
         </div>
       </div>
 

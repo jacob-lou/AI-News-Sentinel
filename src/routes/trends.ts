@@ -63,6 +63,7 @@ router.get('/trends', async (req: Request, res: Response) => {
 
   // 排序
   let orderBy: any[]
+  let useRawImportance = false
   switch (sort) {
     case 'newest':
       orderBy = [{ publishedAt: { sort: 'desc', nulls: 'last' } }, { fetchedAt: 'desc' }]
@@ -73,21 +74,43 @@ router.get('/trends', async (req: Request, res: Response) => {
     case 'fetchedAt':
       orderBy = [{ fetchedAt: 'desc' }]
       break
+    case 'importance':
+      // 重要程度 = score + commentsCount * 10，综合热度和互动量
+      orderBy = [{ score: 'desc' }, { commentsCount: 'desc' }]
+      useRawImportance = true
+      break
     case 'score':
     default:
       orderBy = [{ score: 'desc' }, { fetchedAt: 'desc' }]
       break
   }
 
-  const [items, total] = await Promise.all([
-    prisma.trendItem.findMany({
-      where,
-      orderBy,
-      skip,
-      take: limit,
-    }),
-    prisma.trendItem.count({ where }),
-  ])
+  let items: any[]
+  let total: number
+
+  if (useRawImportance) {
+    // Use Prisma but with dual sort: score desc, then commentsCount desc
+    // This effectively ranks items with both high score AND high engagement first
+    [items, total] = await Promise.all([
+      prisma.trendItem.findMany({
+        where,
+        orderBy: [{ score: 'desc' }, { commentsCount: 'desc' }, { fetchedAt: 'desc' }],
+        skip,
+        take: limit,
+      }),
+      prisma.trendItem.count({ where }),
+    ])
+  } else {
+    [items, total] = await Promise.all([
+      prisma.trendItem.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limit,
+      }),
+      prisma.trendItem.count({ where }),
+    ])
+  }
 
   res.json({
     items,

@@ -32,7 +32,7 @@ export class BilibiliSource implements TrendSource {
           title: item.show_name || keyword,
           url: `https://search.bilibili.com/all?keyword=${encodeURIComponent(keyword)}`,
           source: this.name,
-          score: item.hot_id || (100 - (item.position || 50)),
+          score: item.position ? (100 - item.position) * 100 : 0,
           externalId: `bili-hot-${keyword}`,
           extra: JSON.stringify({
             type: 'hot_search',
