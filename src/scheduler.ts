@@ -2,6 +2,7 @@ import { CronJob } from 'cron'
 import { CollectorService } from './services/collector'
 import { AnalysisService } from './services/analysis'
 import { MonitorService } from './services/monitor'
+import { ImportanceService } from './services/importance'
 import { getIO } from './socket'
 
 let job: CronJob | null = null
@@ -12,6 +13,7 @@ export function startScheduler() {
   const collector = new CollectorService()
   const analysis = new AnalysisService()
   const monitor = new MonitorService()
+  const importance = new ImportanceService()
 
   // Run every 30 minutes: at minute 0 and 30 of every hour
   job = CronJob.from({
@@ -46,14 +48,28 @@ export function startScheduler() {
         console.error('[Scheduler] Collection failed:', err)
       }
 
-      // Run AI analysis after collection
+      // Compute importance scores after collection
+      try {
+        console.log('[Scheduler] Computing importance scores...')
+        await importance.computeScores()
+      } catch (err) {
+        console.error('[Scheduler] Importance scoring failed:', err)
+      }
+
+      // Run AI analysis after collection (for both categories)
       if (analysis.isConfigured) {
         try {
           console.log('[Scheduler] Running AI analysis...')
-          const result = await analysis.analyzeTrends()
+          const aiResult = await analysis.analyzeTrends({ category: 'ai' })
+          const generalResult = await analysis.analyzeTrends({ category: 'general' })
           const aio = getIO()
-          if (result && aio) {
-            aio.emit('analysis-update', { analysis: result, timestamp: new Date().toISOString() })
+          if (aio) {
+            if (aiResult) {
+              aio.emit('analysis-update', { analysis: aiResult, category: 'ai', timestamp: new Date().toISOString() })
+            }
+            if (generalResult) {
+              aio.emit('analysis-update', { analysis: generalResult, category: 'general', timestamp: new Date().toISOString() })
+            }
           }
         } catch (err) {
           console.error('[Scheduler] AI analysis failed:', err)

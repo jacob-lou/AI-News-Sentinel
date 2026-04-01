@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express'
 import prisma from '../db'
-import { AnalysisService } from '../services/analysis'
+import { AnalysisService, AnalysisFilter } from '../services/analysis'
 import { ClassifierService } from '../services/classifier'
+import { ImportanceService } from '../services/importance'
 
 const router = Router()
 
@@ -63,7 +64,6 @@ router.get('/trends', async (req: Request, res: Response) => {
 
   // 排序
   let orderBy: any[]
-  let useRawImportance = false
   switch (sort) {
     case 'newest':
       orderBy = [{ publishedAt: { sort: 'desc', nulls: 'last' } }, { fetchedAt: 'desc' }]
@@ -75,9 +75,7 @@ router.get('/trends', async (req: Request, res: Response) => {
       orderBy = [{ fetchedAt: 'desc' }]
       break
     case 'importance':
-      // 重要程度 = score + commentsCount * 10，综合热度和互动量
-      orderBy = [{ score: 'desc' }, { commentsCount: 'desc' }]
-      useRawImportance = true
+      orderBy = [{ importanceScore: 'desc' }, { fetchedAt: 'desc' }]
       break
     case 'score':
     default:
@@ -85,32 +83,15 @@ router.get('/trends', async (req: Request, res: Response) => {
       break
   }
 
-  let items: any[]
-  let total: number
-
-  if (useRawImportance) {
-    // Use Prisma but with dual sort: score desc, then commentsCount desc
-    // This effectively ranks items with both high score AND high engagement first
-    [items, total] = await Promise.all([
-      prisma.trendItem.findMany({
-        where,
-        orderBy: [{ score: 'desc' }, { commentsCount: 'desc' }, { fetchedAt: 'desc' }],
-        skip,
-        take: limit,
-      }),
-      prisma.trendItem.count({ where }),
-    ])
-  } else {
-    [items, total] = await Promise.all([
-      prisma.trendItem.findMany({
-        where,
-        orderBy,
-        skip,
-        take: limit,
-      }),
-      prisma.trendItem.count({ where }),
-    ])
-  }
+  const [items, total] = await Promise.all([
+    prisma.trendItem.findMany({
+      where,
+      orderBy,
+      skip,
+      take: limit,
+    }),
+    prisma.trendItem.count({ where }),
+  ])
 
   res.json({
     items,
@@ -169,6 +150,13 @@ router.post('/trends/refresh', async (_req: Request, res: Response) => {
   // Run collection in background
   const collector = new CollectorService()
   const results = await collector.collectAll()
+
+  // Compute importance scores
+  try {
+    const importance = new ImportanceService()
+    await importance.computeScores()
+  } catch {}
+
   const io = getIO()
   if (io) {
     const allItems = results.flatMap((r: any) => r.items)
@@ -186,27 +174,49 @@ router.post('/trends/refresh', async (_req: Request, res: Response) => {
   }
 })
 
-// GET /api/trends/analysis - 获取最新 AI 分析
-router.get('/trends/analysis', async (_req: Request, res: Response) => {
+// GET /api/trends/analysis - 获取最新 AI 分析（支持按筛选条件查询缓存）
+router.get('/trends/analysis', async (req: Request, res: Response) => {
   const service = new AnalysisService()
-  const analysis = await service.getLatestAnalysis()
+  const filter: AnalysisFilter = {
+    category: req.query.category as string,
+    source: req.query.source as string,
+    search: req.query.search as string,
+    days: req.query.days ? parseInt(req.query.days as string) : undefined,
+    minScore: req.query.minScore ? parseInt(req.query.minScore as string) : undefined,
+  }
+  const category = filter.category || 'all'
+  const filterHash = AnalysisService.buildFilterHash(filter)
+  const analysis = await service.getLatestAnalysis(category, filterHash)
   res.json({ analysis, configured: service.isConfigured })
 })
 
-// POST /api/trends/analyze - 手动触发 AI 分析
-router.post('/trends/analyze', async (_req: Request, res: Response) => {
+// POST /api/trends/analyze - 手动触发 AI 分析（支持筛选条件）
+router.post('/trends/analyze', async (req: Request, res: Response) => {
   const service = new AnalysisService()
   if (!service.isConfigured) {
     res.status(400).json({ error: 'OpenRouter API key not configured' })
     return
   }
+
+  const filter: AnalysisFilter = {
+    category: req.body.category,
+    source: req.body.source,
+    search: req.body.search,
+    days: req.body.days ? parseInt(req.body.days) : undefined,
+    minScore: req.body.minScore ? parseInt(req.body.minScore) : undefined,
+  }
+
   res.json({ message: 'Analysis started' })
 
-  const result = await service.analyzeTrends()
+  const result = await service.analyzeTrends(filter)
   const { getIO } = require('../socket')
   const io = getIO()
   if (io && result) {
-    io.emit('analysis-update', { analysis: result, timestamp: new Date().toISOString() })
+    io.emit('analysis-update', {
+      analysis: result,
+      category: filter.category || 'all',
+      timestamp: new Date().toISOString(),
+    })
   }
 })
 

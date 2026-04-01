@@ -1,4 +1,13 @@
 import prisma from '../db'
+import { createHash } from 'crypto'
+
+export interface AnalysisFilter {
+  category?: string
+  source?: string
+  search?: string
+  days?: number
+  minScore?: number
+}
 
 export class AnalysisService {
   private apiKey: string | null = null
@@ -17,16 +26,66 @@ export class AnalysisService {
     return this.apiKey !== null
   }
 
-  async analyzeTrends(): Promise<{ summary: string; topics: any[] } | null> {
+  /** Build a deterministic hash from filter params for cache lookup */
+  static buildFilterHash(filter: AnalysisFilter): string {
+    const normalized = {
+      source: filter.source || '',
+      search: filter.search || '',
+      days: filter.days || 30,
+      minScore: filter.minScore || 0,
+    }
+    return createHash('md5').update(JSON.stringify(normalized)).digest('hex').substring(0, 12)
+  }
+
+  /** Build Prisma where clause matching the trends route logic */
+  private buildWhere(filter: AnalysisFilter): any {
+    const where: any = {}
+
+    if (filter.category === 'ai' || filter.category === 'general') {
+      where.category = filter.category
+    }
+
+    if (filter.source) {
+      const sources = filter.source.split(',').map(s => s.trim()).filter(Boolean)
+      if (sources.length === 1) {
+        where.source = sources[0]
+      } else if (sources.length > 1) {
+        where.source = { in: sources }
+      }
+    }
+
+    if (filter.search) {
+      where.title = { contains: filter.search }
+    }
+
+    if (filter.minScore && filter.minScore > 0) {
+      where.score = { gte: filter.minScore }
+    }
+
+    const maxAgeDays = Math.min(90, Math.max(1, filter.days || 30))
+    const since = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000)
+    where.OR = [
+      { publishedAt: { gte: since } },
+      { publishedAt: null, fetchedAt: { gte: since } },
+    ]
+
+    return where
+  }
+
+  async analyzeTrends(filter: AnalysisFilter = {}): Promise<{ summary: string; topics: any[] } | null> {
     if (!this.apiKey) {
       console.warn('[Analysis] OpenRouter API key not configured')
       return null
     }
 
-    // Get recent trends from the last collection
+    const category = filter.category || 'all'
+    const filterHash = AnalysisService.buildFilterHash(filter)
+
+    const where = this.buildWhere(filter)
     const recentTrends = await prisma.trendItem.findMany({
-      orderBy: { fetchedAt: 'desc' },
-      take: 60,
+      where,
+      orderBy: [{ score: 'desc' }, { fetchedAt: 'desc' }],
+      take: 80,
       select: { title: true, source: true, score: true },
     })
 
@@ -36,7 +95,9 @@ export class AnalysisService {
       .map((t) => `[${t.source}] ${t.title} (score: ${t.score})`)
       .join('\n')
 
-    const prompt = `你是一个热点分析专家。以下是从多个平台（Google、Reddit、HackerNews、DuckDuckGo、Twitter）采集到的最新热点数据。
+    const categoryLabel = category === 'ai' ? 'AI/科技' : category === 'general' ? '综合' : '全部'
+
+    const prompt = `你是一个热点分析专家。以下是从多个平台采集到的【${categoryLabel}】类最新热点数据。
 
 请分析这些热点，返回以下 JSON 格式：
 {
@@ -79,7 +140,7 @@ ${trendsList}`
         throw new Error(`OpenRouter API error ${response.status}: ${errText}`)
       }
 
-      const completion = await response.json()
+      const completion: any = await response.json()
       const content = completion.choices?.[0]?.message?.content
       if (!content) return null
 
@@ -87,16 +148,18 @@ ${trendsList}`
       const jsonStr = content.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim()
       const result = JSON.parse(jsonStr)
 
-      // Save to database
+      // Save to database with category and filterHash
       await prisma.trendAnalysis.create({
         data: {
           summary: result.summary || '',
           topics: JSON.stringify(result.topics || []),
           model: this.model,
+          category,
+          filterHash,
         },
       })
 
-      console.log(`[Analysis] Generated analysis with ${result.topics?.length || 0} topics`)
+      console.log(`[Analysis] Generated ${categoryLabel} analysis with ${result.topics?.length || 0} topics (hash: ${filterHash})`)
       return result
     } catch (err: any) {
       console.error('[Analysis] Failed:', err?.message || err)
@@ -104,8 +167,13 @@ ${trendsList}`
     }
   }
 
-  async getLatestAnalysis() {
+  async getLatestAnalysis(category?: string, filterHash?: string) {
+    const where: any = {}
+    if (category) where.category = category
+    if (filterHash) where.filterHash = filterHash
+
     const analysis = await prisma.trendAnalysis.findFirst({
+      where,
       orderBy: { createdAt: 'desc' },
     })
 
@@ -117,6 +185,8 @@ ${trendsList}`
       topics: JSON.parse(analysis.topics),
       model: analysis.model,
       createdAt: analysis.createdAt,
+      category: analysis.category,
+      filterHash: analysis.filterHash,
     }
   }
 }

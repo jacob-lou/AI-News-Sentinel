@@ -19,6 +19,10 @@
   // Compact mode
   let isCompact = localStorage.getItem('compact') === 'true';
 
+  // Per-tab analysis debounce timers
+  var aiAnalysisTimer = null;
+  var generalAnalysisTimer = null;
+
   // === DOM refs ===
   const trendsList = document.getElementById('trendsList');
   const refreshBtn = document.getElementById('refreshBtn');
@@ -249,16 +253,77 @@
     } catch {}
   }
 
-  async function loadAnalysis() {
+  function buildAnalysisParams(state, category) {
+    var params = new URLSearchParams({ category: category });
+    if (state.sources.length > 0) params.set('source', state.sources.join(','));
+    if (state.search) params.set('search', state.search);
+    params.set('days', String(state.days));
+    if (state.minScore > 0) params.set('minScore', String(state.minScore));
+    return params;
+  }
+
+  async function loadAnalysisForTab(category, state) {
+    var params = buildAnalysisParams(state, category);
+    var target = category === 'general' ? 'general' : undefined;
+
     try {
-      var res = await fetch('/api/trends/analysis');
+      var res = await fetch('/api/trends/analysis?' + params.toString());
       var data = await res.json();
+      if (!data.configured) { analyzeBtn.style.display = 'none'; return; }
+
       if (data.analysis) {
-        renderAnalysis(data.analysis);
-        renderAnalysis(data.analysis, 'general');
+        renderAnalysis(data.analysis, target);
+        // If analysis is stale (> 1 hour), trigger refresh
+        var age = Date.now() - new Date(data.analysis.createdAt).getTime();
+        if (age > 3600000) {
+          triggerAnalysisForTab(category, state);
+        }
+      } else {
+        triggerAnalysisForTab(category, state);
       }
-      if (!data.configured) analyzeBtn.style.display = 'none';
     } catch {}
+  }
+
+  function triggerAnalysisForTab(category, state) {
+    var body = { category: category, days: state.days };
+    if (state.sources.length > 0) body.source = state.sources.join(',');
+    if (state.search) body.search = state.search;
+    if (state.minScore > 0) body.minScore = state.minScore;
+
+    showAnalysisLoading(category);
+    fetch('/api/trends/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).catch(function() {});
+  }
+
+  function showAnalysisLoading(category) {
+    var panel, summary;
+    if (category === 'general') {
+      panel = document.getElementById('generalAnalysisPanel');
+      summary = document.getElementById('generalAnalysisSummary');
+    } else {
+      panel = analysisPanel;
+      summary = analysisSummary;
+    }
+    if (panel) panel.style.display = '';
+    if (summary) summary.innerHTML = '<span class="analysis-loading">\u6b63\u5728\u5206\u6790\u4e2d\u2026</span>';
+  }
+
+  function scheduleAnalysis(category, state) {
+    if (category === 'ai') {
+      clearTimeout(aiAnalysisTimer);
+      aiAnalysisTimer = setTimeout(function () { loadAnalysisForTab('ai', aiState); }, 5000);
+    } else {
+      clearTimeout(generalAnalysisTimer);
+      generalAnalysisTimer = setTimeout(function () { loadAnalysisForTab('general', generalState); }, 5000);
+    }
+  }
+
+  async function loadAnalysis() {
+    loadAnalysisForTab('ai', aiState);
+    loadAnalysisForTab('general', generalState);
   }
 
   // === Keywords CRUD ===
@@ -666,7 +731,7 @@
   var aiPageSizeEl = document.getElementById('aiPageSize');
   var compactToggle = document.getElementById('compactToggle');
 
-  function reloadAi() { aiState.page = 1; loadTrends(); }
+  function reloadAi() { aiState.page = 1; loadTrends(); scheduleAnalysis('ai', aiState); }
 
   initDropdown(aiSortDropdown, function (val) { aiState.sort = val; reloadAi(); });
   initDropdown(aiSourceDropdown, function () {
@@ -712,7 +777,7 @@
   var generalHasUrl = document.getElementById('generalHasUrl');
   var generalPageSizeEl = document.getElementById('generalPageSize');
 
-  function reloadGeneral() { generalState.page = 1; loadGeneralTrends(); }
+  function reloadGeneral() { generalState.page = 1; loadGeneralTrends(); scheduleAnalysis('general', generalState); }
 
   initDropdown(generalSortDropdown, function (val) { generalState.sort = val; reloadGeneral(); });
   initDropdown(generalSourceDropdown, function () {
@@ -761,7 +826,11 @@
 
   analyzeBtn.addEventListener('click', async function () {
     analyzeBtn.disabled = true;
-    try { await fetch('/api/trends/analyze', { method: 'POST' }); } catch {}
+    if (generalTab.classList.contains('active')) {
+      triggerAnalysisForTab('general', generalState);
+    } else {
+      triggerAnalysisForTab('ai', aiState);
+    }
     setTimeout(function () { analyzeBtn.disabled = false; }, 10000);
   });
 
@@ -798,8 +867,11 @@
 
   socket.on('analysis-update', function (data) {
     if (data.analysis) {
-      renderAnalysis(data.analysis);
-      renderAnalysis(data.analysis, 'general');
+      if (data.category === 'general') {
+        renderAnalysis(data.analysis, 'general');
+      } else {
+        renderAnalysis(data.analysis);
+      }
       analyzeBtn.disabled = false;
     }
   });

@@ -8,18 +8,19 @@ generator client {
 }
 
 model TrendItem {
-  id            Int       @id @default(autoincrement())
-  title         String
-  url           String?
-  source        String
-  score         Int       @default(0)
-  commentsCount Int       @default(0)
-  category      String    @default("general")
-  extra         String?
-  externalId    String?
-  publishedAt   DateTime?
-  fetchedAt     DateTime  @default(now())
-  createdAt     DateTime  @default(now())
+  id              Int       @id @default(autoincrement())
+  title           String
+  url             String?
+  source          String
+  score           Int       @default(0)
+  commentsCount   Int       @default(0)
+  category        String    @default("general")
+  importanceScore Float     @default(0)
+  extra           String?
+  externalId      String?
+  publishedAt     DateTime?
+  fetchedAt       DateTime  @default(now())
+  createdAt       DateTime  @default(now())
 
   @@unique([source, externalId])
   @@index([source])
@@ -27,6 +28,7 @@ model TrendItem {
   @@index([publishedAt])
   @@index([commentsCount])
   @@index([category])
+  @@index([importanceScore])
 }
 
 model CategoryRule {
@@ -52,11 +54,15 @@ model FetchLog {
 }
 
 model TrendAnalysis {
-  id        Int      @id @default(autoincrement())
-  summary   String
-  topics    String
-  model     String
-  createdAt DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  category   String   @default("all")
+  filterHash String   @default("")
+  summary    String
+  topics     String
+  model      String
+  createdAt  DateTime @default(now())
+
+  @@index([category, filterHash])
 }
 
 model MonitorKeyword {
