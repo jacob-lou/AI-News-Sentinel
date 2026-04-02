@@ -3,6 +3,7 @@ import prisma from '../db'
 import { AnalysisService, AnalysisFilter } from '../services/analysis'
 import { ClassifierService } from '../services/classifier'
 import { ImportanceService } from '../services/importance'
+import { TranslatorService } from '../services/translator'
 
 const router = Router()
 
@@ -230,6 +231,59 @@ router.post('/trends/backfill-categories', async (_req: Request, res: Response) 
     console.log(`[Backfill] Done: ${result.total} processed, ${result.aiCount} classified as AI`)
   } catch (err: any) {
     console.error('[Backfill] Failed:', err?.message || err)
+  }
+})
+
+// POST /api/trends/summary - 批量生成一句话摘要（前端按需调用）
+router.post('/trends/summary', async (req: Request, res: Response) => {
+  const ids: number[] = req.body.ids
+  if (!Array.isArray(ids) || ids.length === 0) {
+    res.status(400).json({ error: 'ids array required' })
+    return
+  }
+
+  // Cap at 50 per request
+  const limitedIds = ids.slice(0, 50).filter(id => typeof id === 'number' && id > 0)
+
+  const translator = new TranslatorService()
+  if (!translator.isConfigured) {
+    res.status(400).json({ error: 'OpenRouter API key not configured' })
+    return
+  }
+
+  // Return existing summaries immediately, generate missing ones
+  const existing = await prisma.trendItem.findMany({
+    where: { id: { in: limitedIds }, summary: { not: null } },
+    select: { id: true, summary: true },
+  })
+  const existingMap = new Map(existing.map(e => [e.id, e.summary]))
+
+  const missingIds = limitedIds.filter(id => !existingMap.has(id))
+  let generatedMap = new Map<number, string>()
+  if (missingIds.length > 0) {
+    generatedMap = await translator.generateSummaries(missingIds)
+  }
+
+  const summaries = limitedIds
+    .map(id => ({
+      id,
+      summary: existingMap.get(id) || generatedMap.get(id) || null,
+    }))
+    .filter(s => s.summary !== null)
+
+  res.json({ summaries })
+})
+
+// POST /api/trends/backfill-translations - 为历史数据补充翻译
+router.post('/trends/backfill-translations', async (_req: Request, res: Response) => {
+  const translator = new TranslatorService()
+  res.json({ message: 'Translation backfill started' })
+
+  try {
+    const result = await translator.backfill()
+    console.log(`[Backfill] Translations done: ${result.total} processed, ${result.translated} translated`)
+  } catch (err: any) {
+    console.error('[Backfill] Translation failed:', err?.message || err)
   }
 })
 

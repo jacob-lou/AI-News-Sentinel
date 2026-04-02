@@ -1,6 +1,7 @@
 import prisma from '../db'
 import { TrendSource, TrendData, SourceResult } from '../sources/base'
 import { ClassifierService } from './classifier'
+import { TranslatorService } from './translator'
 import { GoogleTrendsSource } from '../sources/google'
 import { RedditSource } from '../sources/reddit'
 import { HackerNewsSource } from '../sources/hackernews'
@@ -15,6 +16,7 @@ import { BilibiliSource } from '../sources/bilibili'
 export class CollectorService {
   private sources: TrendSource[] = []
   private classifier = new ClassifierService()
+  private translator = new TranslatorService()
 
   constructor() {
     this.sources.push(new GoogleTrendsSource())
@@ -46,7 +48,19 @@ export class CollectorService {
 
         // Classify items before saving
         const categories = await this.classifier.classify(items)
-        const saved = await this.saveItems(items, categories)
+
+        // Detect language and translate titles
+        let translations: { language: string; titleZh: string | null; titleEn: string | null }[] = []
+        try {
+          translations = await this.translator.detectAndTranslate(items)
+        } catch (err: any) {
+          console.error(`[Collector] Translation failed for ${source.name}:`, err?.message)
+          // Fill with language-only fallback
+          const { detectLanguage } = require('./translator')
+          translations = items.map(i => ({ language: detectLanguage(i.title), titleZh: null, titleEn: null }))
+        }
+
+        const saved = await this.saveItems(items, categories, translations)
 
         await prisma.fetchLog.create({
           data: {
@@ -87,12 +101,17 @@ export class CollectorService {
     return results
   }
 
-  private async saveItems(items: TrendData[], categories: string[]): Promise<TrendData[]> {
+  private async saveItems(
+    items: TrendData[],
+    categories: string[],
+    translations: { language: string; titleZh: string | null; titleEn: string | null }[] = [],
+  ): Promise<TrendData[]> {
     const saved: TrendData[] = []
 
     for (let idx = 0; idx < items.length; idx++) {
       const item = items[idx]
       const category = categories[idx] || 'general'
+      const tr = translations[idx] || { language: null, titleZh: null, titleEn: null }
       try {
         const commentsCount = this.extractCommentsCount(item)
         await prisma.trendItem.upsert({
@@ -110,6 +129,9 @@ export class CollectorService {
             publishedAt: item.publishedAt,
             commentsCount,
             category,
+            ...(tr.language ? { language: tr.language } : {}),
+            ...(tr.titleZh ? { titleZh: tr.titleZh } : {}),
+            ...(tr.titleEn ? { titleEn: tr.titleEn } : {}),
           },
           create: {
             title: item.title,
@@ -121,6 +143,9 @@ export class CollectorService {
             publishedAt: item.publishedAt,
             commentsCount,
             category,
+            language: tr.language,
+            titleZh: tr.titleZh,
+            titleEn: tr.titleEn,
           },
         })
         saved.push(item)

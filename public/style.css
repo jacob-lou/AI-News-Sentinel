@@ -544,6 +544,65 @@ button { cursor: pointer; font-family: var(--font); }
 .source-tag.bingnews   { background: #E3F2FD; color: #0D47A1; }
 .source-tag.bilibili   { background: #FCE4EC; color: #C62828; }
 
+/* --- Language tag --- */
+.lang-tag {
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #F5F5F5;
+  color: #757575;
+  letter-spacing: 0.02em;
+  margin-right: 2px;
+}
+
+/* --- Cross-source badge --- */
+.cross-source-badge {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #FFF3E0, #FFE0B2);
+  color: #E65100;
+  margin-right: 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* --- Summary --- */
+.trend-summary {
+  font-size: 0.78rem;
+  color: #8E8E93;
+  line-height: 1.5;
+  margin: 2px 0 3px;
+  max-width: 600px;
+}
+.btn-summary {
+  background: none;
+  border: 1px dashed #D1D1D6;
+  color: #8E8E93;
+  font-size: 0.7rem;
+  padding: 1px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-summary:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+.btn-summary:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* --- Language trigger in topbar --- */
+.lang-trigger {
+  gap: 4px;
+  font-size: 0.82rem;
+}
+
 /* --- Twitter tweet styles --- */
 .tw-author {
   color: var(--accent-blue);
@@ -856,6 +915,14 @@ body.compact .trend-rank {
 body.compact .source-tag {
   font-size: 0.62rem;
   padding: 1px 6px;
+}
+body.compact .trend-summary {
+  font-size: 0.7rem;
+  margin: 1px 0 2px;
+}
+body.compact .cross-source-badge {
+  font-size: 0.58rem;
+  padding: 0px 5px;
 }
 
 /* --- Empty state --- */

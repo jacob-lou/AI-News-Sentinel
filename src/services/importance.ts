@@ -107,13 +107,33 @@ export class ImportanceService {
     }
 
     // Step 3: Combined score = normalizedScore*0.4 + normalizedComments*0.3 + crossSourceBonus*0.3
-    const updates: { id: number; importanceScore: number }[] = []
+    // Also track crossSourceCount for frontend display
+    const crossSourceCount = new Map<number, number>()
+    for (const item of items) {
+      const tokens = itemTokens.get(item.id) || []
+      const matchingSources = new Set<string>()
+      for (const token of tokens) {
+        const sources = tokenSources.get(token)
+        if (sources && sources.size > 1) {
+          for (const s of sources) {
+            if (s !== item.source) matchingSources.add(s)
+          }
+        }
+      }
+      crossSourceCount.set(item.id, matchingSources.size)
+    }
+
+    const updates: { id: number; importanceScore: number; crossSourceCount: number }[] = []
     for (const item of items) {
       const ns = normalizedScore.get(item.id) || 0
       const nc = normalizedComments.get(item.id) || 0
       const csb = crossSourceBonus.get(item.id) || 0
       const importance = ns * 0.4 + nc * 0.3 + csb * 0.3
-      updates.push({ id: item.id, importanceScore: Math.round(importance * 100) / 100 })
+      updates.push({
+        id: item.id,
+        importanceScore: Math.round(importance * 100) / 100,
+        crossSourceCount: crossSourceCount.get(item.id) || 0,
+      })
     }
 
     // Batch update in chunks
@@ -123,7 +143,7 @@ export class ImportanceService {
       await Promise.all(
         chunk.map(u => prisma.trendItem.update({
           where: { id: u.id },
-          data: { importanceScore: u.importanceScore },
+          data: { importanceScore: u.importanceScore, crossSourceCount: u.crossSourceCount },
         }))
       )
     }

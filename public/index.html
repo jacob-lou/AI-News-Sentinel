@@ -32,6 +32,16 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
           <span>AI 分析</span>
         </button>
+        <div class="dropdown" id="langDropdown">
+          <button class="dropdown-trigger lang-trigger" data-value="zh">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            <span>中文</span>
+          </button>
+          <div class="dropdown-menu">
+            <button class="dropdown-item active" data-value="zh">中文</button>
+            <button class="dropdown-item" data-value="en">English</button>
+          </div>
+        </div>
       </div>
     </nav>
 
@@ -105,19 +115,19 @@
           <div class="filter-group">
             <label class="filter-label">时间</label>
             <div class="time-pills" id="aiTimePills">
-              <button class="pill-sm active" data-days="30">30天</button>
+              <button class="pill-sm" data-days="30">30天</button>
               <button class="pill-sm" data-days="1">今天</button>
               <button class="pill-sm" data-days="3">3天</button>
-              <button class="pill-sm" data-days="7">7天</button>
+              <button class="pill-sm active" data-days="7">7天</button>
               <button class="pill-sm" data-days="90">90天</button>
             </div>
           </div>
           <div class="filter-group">
             <label class="filter-label">热度</label>
             <div class="time-pills" id="aiScorePills">
-              <button class="pill-sm active" data-score="0">不限</button>
+              <button class="pill-sm" data-score="0">不限</button>
               <button class="pill-sm" data-score="50">中热度</button>
-              <button class="pill-sm" data-score="200">高热度</button>
+              <button class="pill-sm active" data-score="200">高热度</button>
             </div>
           </div>
           <div class="filter-group">
@@ -127,8 +137,8 @@
               <div class="page-size-group">
                 <span>每页</span>
                 <select id="aiPageSize" class="select-sm">
-                  <option value="20">20</option>
-                  <option value="50" selected>50</option>
+                  <option value="20" selected>20</option>
+                  <option value="50">50</option>
                   <option value="100">100</option>
                 </select>
               </div>
@@ -210,19 +220,19 @@
           <div class="filter-group">
             <label class="filter-label">时间</label>
             <div class="time-pills" id="generalTimePills">
-              <button class="pill-sm active" data-days="30">30天</button>
+              <button class="pill-sm" data-days="30">30天</button>
               <button class="pill-sm" data-days="1">今天</button>
               <button class="pill-sm" data-days="3">3天</button>
-              <button class="pill-sm" data-days="7">7天</button>
+              <button class="pill-sm active" data-days="7">7天</button>
               <button class="pill-sm" data-days="90">90天</button>
             </div>
           </div>
           <div class="filter-group">
             <label class="filter-label">热度</label>
             <div class="time-pills" id="generalScorePills">
-              <button class="pill-sm active" data-score="0">不限</button>
+              <button class="pill-sm" data-score="0">不限</button>
               <button class="pill-sm" data-score="50">中热度</button>
-              <button class="pill-sm" data-score="200">高热度</button>
+              <button class="pill-sm active" data-score="200">高热度</button>
             </div>
           </div>
           <div class="filter-group">
@@ -232,8 +242,8 @@
               <div class="page-size-group">
                 <span>每页</span>
                 <select id="generalPageSize" class="select-sm">
-                  <option value="20">20</option>
-                  <option value="50" selected>50</option>
+                  <option value="20" selected>20</option>
+                  <option value="50">50</option>
                   <option value="100">100</option>
                 </select>
               </div>

@@ -14,13 +14,18 @@ model TrendItem {
   source          String
   score           Int       @default(0)
   commentsCount   Int       @default(0)
-  category        String    @default("general")
-  importanceScore Float     @default(0)
-  extra           String?
-  externalId      String?
-  publishedAt     DateTime?
-  fetchedAt       DateTime  @default(now())
-  createdAt       DateTime  @default(now())
+  category         String    @default("general")
+  importanceScore  Float     @default(0)
+  language         String?
+  titleZh          String?
+  titleEn          String?
+  summary          String?
+  crossSourceCount Int       @default(0)
+  extra            String?
+  externalId       String?
+  publishedAt      DateTime?
+  fetchedAt        DateTime  @default(now())
+  createdAt        DateTime  @default(now())
 
   @@unique([source, externalId])
   @@index([source])
@@ -29,6 +34,7 @@ model TrendItem {
   @@index([commentsCount])
   @@index([category])
   @@index([importanceScore])
+  @@index([language])
 }
 
 model CategoryRule {

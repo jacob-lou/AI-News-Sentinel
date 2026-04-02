@@ -7,17 +7,158 @@
 
   // === Filter state per tab ===
   const aiState = {
-    page: 1, pageSize: 50, sort: 'score', sources: [], search: '',
-    days: 30, minScore: 0, hasUrl: false,
+    page: 1, pageSize: 20, sort: 'score', sources: [], search: '',
+    days: 7, minScore: 200, hasUrl: false,
   };
   const generalState = {
-    page: 1, pageSize: 50, sort: 'score', sources: [], search: '',
-    days: 30, minScore: 0, hasUrl: false,
+    page: 1, pageSize: 20, sort: 'score', sources: [], search: '',
+    days: 7, minScore: 200, hasUrl: false,
   };
   const kwState = { sort: 'fetchedAt', days: 0 };
 
   // Compact mode
   let isCompact = localStorage.getItem('compact') === 'true';
+
+  // Display language: 'zh' or 'en'
+  var displayLang = localStorage.getItem('displayLang') || 'zh';
+
+  // Language labels for display
+  var langLabels = { zh: '中', en: 'EN', ja: '日', ko: '한' };
+
+  // i18n translations
+  var i18n = {
+    zh: {
+      appTitle: '热点追踪', connected: '已连接', disconnected: '断开连接', connecting: '连接中',
+      aiAnalysis: 'AI 分析', refresh: '刷新数据', tabAi: 'AI 热点', tabGeneral: '综合热点', tabKeywords: '热点监控',
+      searchPlaceholder: '搜索标题…', sortHot: '最热', sortImportance: '重要程度', sortNewest: '最新发布',
+      sortComments: '最多互动', sortLatest: '最新采集', sources: '数据源', filter: '筛选',
+      filterTime: '时间', filterHeat: '热度', filterOptions: '选项',
+      today: '今天', days3: '3天', days7: '7天', days30: '30天', days90: '90天',
+      heatAll: '不限', heatMedium: '中热度', heatHigh: '高热度',
+      urlOnly: '仅有链接', perPage: '每页', compact: '紧凑',
+      noData: '暂无数据，等待首次采集…', loadFailed: '加载失败，请刷新重试',
+      prevPage: '上一页', nextPage: '下一页',
+      aiTrendAnalysis: 'AI 趋势分析', analyzing: '正在分析中…',
+      generateSummary: '生成摘要', generating: '生成中…', generateFailed: '生成失败', noGenerate: '无法生成',
+      justNow: '刚刚', minutesAgo: '分钟前', hoursAgo: '小时前', daysAgo: '天前',
+      replies: '回复', hotSearch: '热搜', selectAll: '全选',
+      noKeywords: '暂无监控关键词，请添加', noAlerts: '暂无告警', noRelated: '暂无相关热点', noAlertRecords: '暂无告警记录',
+      alerts: '告警', hotspots: '热点', pause: '暂停', enable: '启用', deleteTxt: '删除',
+      verified: '已验证', notVerified: '未通过', newData: '新数据', items: '条', failed: '失败',
+      crossSource2: '2源热议', crossSource3: '3源热议', crossSource4: '4+源热议',
+      keywordFound: '发现', newRelated: '条新的相关内容', verifiedAccount: '认证账号',
+      kwPlaceholder: '输入关键词，如 AI编程', kwScope: '分类', addBtn: '添加',
+      checkNow: '立即检查', collectTrends: '采集热点', closeTxt: '关闭',
+      alertsTab: '告警', trendsTab: '热点', recentAlerts: '最近告警',
+      byTime: '按时间', byHeat: '按热度', allTime: '全部',
+    },
+    en: {
+      appTitle: 'Hot Topics', connected: 'Connected', disconnected: 'Disconnected', connecting: 'Connecting',
+      aiAnalysis: 'AI Analysis', refresh: 'Refresh', tabAi: 'AI Trends', tabGeneral: 'General', tabKeywords: 'Monitor',
+      searchPlaceholder: 'Search titles...', sortHot: 'Hottest', sortImportance: 'Importance', sortNewest: 'Newest',
+      sortComments: 'Most Comments', sortLatest: 'Latest', sources: 'Sources', filter: 'Filter',
+      filterTime: 'Time', filterHeat: 'Heat', filterOptions: 'Options',
+      today: 'Today', days3: '3d', days7: '7d', days30: '30d', days90: '90d',
+      heatAll: 'All', heatMedium: 'Medium', heatHigh: 'High',
+      urlOnly: 'URL only', perPage: 'Per page', compact: 'Compact',
+      noData: 'No data yet, waiting for collection...', loadFailed: 'Load failed, please retry',
+      prevPage: 'Prev', nextPage: 'Next',
+      aiTrendAnalysis: 'AI Trend Analysis', analyzing: 'Analyzing...',
+      generateSummary: 'Summary', generating: 'Generating...', generateFailed: 'Failed', noGenerate: 'N/A',
+      justNow: 'just now', minutesAgo: 'm ago', hoursAgo: 'h ago', daysAgo: 'd ago',
+      replies: 'replies', hotSearch: 'Hot Search', selectAll: 'Select all',
+      noKeywords: 'No keywords yet', noAlerts: 'No alerts', noRelated: 'No related trends', noAlertRecords: 'No alerts recorded',
+      alerts: 'alerts', hotspots: 'trends', pause: 'Pause', enable: 'Enable', deleteTxt: 'Delete',
+      verified: 'Verified', notVerified: 'Unverified', newData: 'New data', items: 'items', failed: 'Failed',
+      crossSource2: '2 sources', crossSource3: '3 sources', crossSource4: '4+ sources',
+      keywordFound: 'Found', newRelated: 'new related items', verifiedAccount: 'Verified',
+      kwPlaceholder: 'Enter keyword, e.g. AI coding', kwScope: 'Scope', addBtn: 'Add',
+      checkNow: 'Check now', collectTrends: 'Collect trends', closeTxt: 'Close',
+      alertsTab: 'Alerts', trendsTab: 'Trends', recentAlerts: 'Recent Alerts',
+      byTime: 'By time', byHeat: 'By heat', allTime: 'All',
+    }
+  };
+  function t(key) { return (i18n[displayLang] || i18n.zh)[key] || i18n.zh[key] || key; }
+
+  function applyUILanguage() {
+    // Logo
+    var logo = document.querySelector('.logo-text');
+    if (logo) logo.textContent = t('appTitle');
+    // Analyze button
+    var abtn = document.querySelector('#analyzeBtn span');
+    if (abtn) abtn.textContent = t('aiAnalysis');
+    // Refresh title
+    if (refreshBtn) refreshBtn.title = t('refresh');
+    // Tabs
+    tabBtns.forEach(function(btn) {
+      var tab = btn.dataset.tab;
+      var labels = { trends: 'tabAi', general: 'tabGeneral', keywords: 'tabKeywords' };
+      var svg = btn.querySelector('svg');
+      var badge = btn.querySelector('.badge');
+      btn.textContent = '';
+      if (svg) { btn.appendChild(svg); btn.appendChild(document.createTextNode(' ')); }
+      btn.appendChild(document.createTextNode(t(labels[tab] || '')));
+      if (badge) { btn.appendChild(document.createTextNode(' ')); btn.appendChild(badge); }
+    });
+    // Search placeholders
+    document.querySelectorAll('.search-input').forEach(function(inp) { inp.placeholder = t('searchPlaceholder'); });
+    // Sort dropdowns
+    var sortKeys = { score: 'sortHot', importance: 'sortImportance', newest: 'sortNewest', comments: 'sortComments', fetchedAt: 'sortLatest' };
+    document.querySelectorAll('#aiSortDropdown .dropdown-item, #generalSortDropdown .dropdown-item').forEach(function(el) {
+      if (sortKeys[el.dataset.value]) el.textContent = t(sortKeys[el.dataset.value]);
+    });
+    ['aiSortDropdown', 'generalSortDropdown'].forEach(function(id) {
+      var dd = document.getElementById(id);
+      if (!dd) return;
+      var active = dd.querySelector('.dropdown-item.active');
+      if (active) dd.querySelector('.dropdown-trigger span').textContent = active.textContent.trim();
+    });
+    // Source triggers
+    document.querySelectorAll('#aiSourceDropdown .dropdown-trigger span, #generalSourceDropdown .dropdown-trigger span').forEach(function(s) { s.textContent = t('sources'); });
+    // Filter buttons
+    document.querySelectorAll('#aiMoreFilters, #generalMoreFilters').forEach(function(btn) {
+      var svg = btn.querySelector('svg');
+      btn.textContent = '';
+      if (svg) { btn.appendChild(svg); btn.appendChild(document.createTextNode(' ')); }
+      btn.appendChild(document.createTextNode(t('filter')));
+    });
+    // Filter labels
+    var fmap = {'时间':'filterTime','Time':'filterTime','热度':'filterHeat','Heat':'filterHeat','选项':'filterOptions','Options':'filterOptions'};
+    document.querySelectorAll('.filter-label').forEach(function(el) { var k = fmap[el.textContent.trim()]; if (k) el.textContent = t(k); });
+    // Time pills
+    var dmap = {'1':'today','3':'days3','7':'days7','30':'days30','90':'days90'};
+    document.querySelectorAll('.pill-sm[data-days]').forEach(function(p) { if (dmap[p.dataset.days]) p.textContent = t(dmap[p.dataset.days]); });
+    // Score pills
+    var smap = {'0':'heatAll','50':'heatMedium','200':'heatHigh'};
+    document.querySelectorAll('.pill-sm[data-score]').forEach(function(p) { if (smap[p.dataset.score]) p.textContent = t(smap[p.dataset.score]); });
+    // Toggle labels
+    document.querySelectorAll('#aiHasUrl, #generalHasUrl').forEach(function(cb) {
+      var label = cb.parentElement;
+      if (label) { label.childNodes.forEach(function(n) { if (n.nodeType === 3) n.textContent = ' ' + t('urlOnly'); }); }
+    });
+    // Per page
+    document.querySelectorAll('.page-size-group > span:first-child').forEach(function(s) { s.textContent = t('perPage'); });
+    // Compact
+    var ctgl = document.getElementById('compactToggle');
+    if (ctgl) {
+      var svg = ctgl.querySelector('svg');
+      ctgl.textContent = '';
+      if (svg) { ctgl.appendChild(svg); ctgl.appendChild(document.createTextNode(' ')); }
+      ctgl.appendChild(document.createTextNode(t('compact')));
+    }
+    // Analysis labels
+    document.querySelectorAll('.analysis-label').forEach(function(el) {
+      var svg = el.querySelector('svg');
+      el.textContent = '';
+      if (svg) { el.appendChild(svg); el.appendChild(document.createTextNode(' ' + t('aiTrendAnalysis'))); }
+    });
+    // Connection status
+    if (statusEl) {
+      if (statusEl.classList.contains('online')) statusEl.textContent = t('connected');
+      else if (statusEl.classList.contains('offline')) statusEl.textContent = t('disconnected');
+      else statusEl.textContent = t('connecting');
+    }
+  }
 
   // Per-tab analysis debounce timers
   var aiAnalysisTimer = null;
@@ -109,7 +250,7 @@
 
   // === Multi-select source dropdown renderer ===
   function renderSourceMenu(menuEl, sources, state) {
-    var html = '<label class="dropdown-item select-all"><input type="checkbox" checked /> 全选</label>';
+    var html = '<label class="dropdown-item select-all"><input type="checkbox" checked /> ' + t('selectAll') + '</label>';
     sources.forEach(function (s) {
       var checked = state.sources.length === 0 || state.sources.indexOf(s) !== -1;
       html += '<label class="dropdown-item"><input type="checkbox" value="' + s + '"' + (checked ? ' checked' : '') + ' /> ' + (sourceLabels[s] || s) + '</label>';
@@ -224,7 +365,7 @@
       renderTrends(data.items, trendsList, aiState.page, aiState.pageSize);
       renderPagination(data.pagination, paginationEl, function (p) { aiState.page = p; loadTrends(); });
     } catch {
-      trendsList.innerHTML = '<div class="empty-state">加载失败，请刷新重试</div>';
+      trendsList.innerHTML = '<div class="empty-state">' + t('loadFailed') + '</div>';
     }
   }
 
@@ -237,7 +378,7 @@
       renderTrends(data.items, generalTrendsList, generalState.page, generalState.pageSize);
       renderPagination(data.pagination, generalPaginationEl, function (p) { generalState.page = p; loadGeneralTrends(); });
     } catch {
-      generalTrendsList.innerHTML = '<div class="empty-state">加载失败，请刷新重试</div>';
+      generalTrendsList.innerHTML = '<div class="empty-state">' + t('loadFailed') + '</div>';
     }
   }
 
@@ -308,7 +449,7 @@
       summary = analysisSummary;
     }
     if (panel) panel.style.display = '';
-    if (summary) summary.innerHTML = '<span class="analysis-loading">\u6b63\u5728\u5206\u6790\u4e2d\u2026</span>';
+    if (summary) summary.innerHTML = '<span class="analysis-loading">' + t('analyzing') + '</span>';
   }
 
   function scheduleAnalysis(category, state) {
@@ -368,12 +509,30 @@
   }
 
   // === Render: Trends ===
+  function getDisplayTitle(item) {
+    // Return translated title based on displayLang, or original title as fallback
+    if (displayLang === 'zh') {
+      if (item.language === 'zh') return item.title;
+      return item.titleZh || item.title;
+    } else if (displayLang === 'en') {
+      if (item.language === 'en') return item.title;
+      return item.titleEn || item.title;
+    }
+    return item.title;
+  }
+
+  function getOriginalTitle(item) {
+    // Return the original title for tooltip if different from display
+    var display = getDisplayTitle(item);
+    return display !== item.title ? item.title : '';
+  }
+
   function renderTrends(items, container, page, pageSize) {
     if (!container) container = trendsList;
     if (!page) page = 1;
-    if (!pageSize) pageSize = 50;
+    if (!pageSize) pageSize = 20;
     if (!items || items.length === 0) {
-      container.innerHTML = '<div class="empty-state">暂无数据，等待首次采集…</div>';
+      container.innerHTML = '<div class="empty-state">' + t('noData') + '</div>';
       return;
     }
 
@@ -382,20 +541,23 @@
       try { extra = JSON.parse(item.extra || '{}'); } catch {}
 
       var isTweet = item.source === 'twitter' && extra.type === 'tweet';
+      var title = getDisplayTitle(item);
+      var originalTitle = getOriginalTitle(item);
+      var tooltipAttr = originalTitle ? ' title="' + esc(originalTitle) + '"' : '';
 
       // Twitter 推文特殊展示：显示作者信息
       var titleHtml;
       if (isTweet) {
         var authorTag = extra.author ? '<span class="tw-author">@' + esc(extra.author) + '</span> ' : '';
-        var verifiedTag = extra.isVerified ? '<span class="tw-verified" title="认证账号">✓</span> ' : '';
+        var verifiedTag = extra.isVerified ? '<span class="tw-verified" title="' + t('verifiedAccount') + '">✓</span> ' : '';
         var textContent = item.url
-          ? '<a href="' + esc(item.url) + '" target="_blank" rel="noopener">' + esc(item.title) + '</a>'
-          : esc(item.title);
+          ? '<a href="' + esc(item.url) + '" target="_blank" rel="noopener"' + tooltipAttr + '>' + esc(title) + '</a>'
+          : '<span' + tooltipAttr + '>' + esc(title) + '</span>';
         titleHtml = authorTag + verifiedTag + textContent;
       } else {
         titleHtml = item.url
-          ? '<a href="' + esc(item.url) + '" target="_blank" rel="noopener">' + esc(item.title) + '</a>'
-          : esc(item.title);
+          ? '<a href="' + esc(item.url) + '" target="_blank" rel="noopener"' + tooltipAttr + '>' + esc(title) + '</a>'
+          : '<span' + tooltipAttr + '>' + esc(title) + '</span>';
       }
 
       var rankNum = (page - 1) * pageSize + i + 1;
@@ -423,13 +585,13 @@
         }
       } else if (item.source === 'v2ex') {
         if (extra.node) metaParts.push(esc(extra.node));
-        if (extra.replies) metaParts.push(extra.replies + ' 回复');
+        if (extra.replies) metaParts.push(extra.replies + ' ' + t('replies'));
         if (extra.author) metaParts.push('@' + esc(extra.author));
       } else if (item.source === 'bingnews') {
         if (extra.newsSource) metaParts.push(esc(extra.newsSource));
       } else if (item.source === 'bilibili') {
         if (extra.type === 'hot_search') {
-          metaParts.push('热搜');
+          metaParts.push(t('hotSearch'));
         } else if (extra.type === 'tech_video') {
           if (extra.views) metaParts.push('▶ ' + formatScore(extra.views));
           if (extra.likes) metaParts.push('❤ ' + formatScore(extra.likes));
@@ -446,19 +608,62 @@
       var displayTime = item.publishedAt || item.fetchedAt;
       metaParts.push(timeAgo(displayTime));
 
+      // Language tag
+      var langTag = '';
+      if (item.language) {
+        var langLabel = langLabels[item.language] || item.language.toUpperCase();
+        langTag = '<span class="lang-tag">' + esc(langLabel) + '</span>';
+      }
+
+      // Cross-source badge
+      var crossBadge = '';
+      if (item.crossSourceCount >= 2) {
+        var crossKey = item.crossSourceCount >= 4 ? 'crossSource4' : 'crossSource' + item.crossSourceCount;
+        crossBadge = '<span class="cross-source-badge">' + esc(t(crossKey)) + '</span>';
+      }
+
+      // Summary
+      var summaryHtml = '';
+      if (item.summary) {
+        summaryHtml = '<div class="trend-summary">' + esc(item.summary) + '</div>';
+      } else {
+        summaryHtml = '<div class="trend-summary"><button class="btn-summary" data-id="' + item.id + '">' + t('generateSummary') + '</button></div>';
+      }
+
       var delay = Math.min(i * 30, 300);
 
-      return '<div class="trend-item" style="animation-delay:' + delay + 'ms">'
+      return '<div class="trend-item" style="animation-delay:' + delay + 'ms" data-item-id="' + item.id + '">'
         + '<span class="trend-rank' + rankCls + '">' + rankNum + '</span>'
         + '<div class="trend-body">'
-        + '<div class="trend-title">' + titleHtml + '</div>'
+        + '<div class="trend-title">' + crossBadge + titleHtml + '</div>'
+        + summaryHtml
         + '<div class="trend-meta">'
         + '<span class="source-tag ' + esc(item.source) + '">' + esc(item.source) + '</span>'
+        + langTag
         + metaParts.join('<span>·</span>')
         + '</div>'
         + '</div>'
         + '</div>';
     }).join('');
+  }
+
+  // === Summary request ===
+  function requestSummaries(ids, container) {
+    fetch('/api/trends/summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: ids }),
+    })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (data.summaries) {
+        data.summaries.forEach(function (s) {
+          var el = container.querySelector('.trend-item[data-item-id="' + s.id + '"] .trend-summary');
+          if (el) el.innerHTML = esc(s.summary);
+        });
+      }
+    })
+    .catch(function () { /* silent */ });
   }
 
   // === Render: Pagination ===
@@ -469,7 +674,7 @@
       container.innerHTML = '';
       return;
     }
-    var html = '<button ' + (activePage <= 1 ? 'disabled' : '') + ' data-page="' + (activePage - 1) + '">上一页</button>';
+    var html = '<button ' + (activePage <= 1 ? 'disabled' : '') + ' data-page="' + (activePage - 1) + '">' + t('prevPage') + '</button>';
     for (var p = 1; p <= pagination.totalPages; p++) {
       if (pagination.totalPages > 7 && p > 2 && p < pagination.totalPages - 1 && Math.abs(p - activePage) > 1) {
         if (p === 3 || p === pagination.totalPages - 2) html += '<button disabled>…</button>';
@@ -477,7 +682,7 @@
       }
       html += '<button ' + (p === activePage ? 'class="current" disabled' : '') + ' data-page="' + p + '">' + p + '</button>';
     }
-    html += '<button ' + (activePage >= pagination.totalPages ? 'disabled' : '') + ' data-page="' + (activePage + 1) + '">下一页</button>';
+    html += '<button ' + (activePage >= pagination.totalPages ? 'disabled' : '') + ' data-page="' + (activePage + 1) + '">' + t('nextPage') + '</button>';
     container.innerHTML = html;
 
     if (onPageChange) {
@@ -523,7 +728,7 @@
   // === Render: Keyword list ===
   function renderKeywordList(keywords) {
     if (!keywords || keywords.length === 0) {
-      keywordListEl.innerHTML = '<div class="empty-state">暂无监控关键词，请添加</div>';
+      keywordListEl.innerHTML = '<div class="empty-state">' + t('noKeywords') + '</div>';
       return;
     }
     keywordListEl.innerHTML = keywords.map(function (kw, i) {
@@ -532,10 +737,10 @@
       return '<div class="kw-card' + cls + '" data-kwid="' + kw.id + '" style="animation-delay:' + delay + 'ms">'
         + '<span class="kw-name">' + esc(kw.keyword) + '</span>'
         + (kw.scope !== 'general' ? '<span class="kw-scope">' + esc(kw.scope) + '</span>' : '')
-        + '<span class="kw-stats">' + (kw._count?.alerts || 0) + ' 告警 · ' + (kw._count?.trends || 0) + ' 热点</span>'
+        + '<span class="kw-stats">' + (kw._count?.alerts || 0) + ' ' + t('alerts') + ' · ' + (kw._count?.trends || 0) + ' ' + t('hotspots') + '</span>'
         + '<div class="kw-btns">'
-        + '<button class="kw-btn toggle-btn" data-kwid="' + kw.id + '" data-active="' + kw.active + '">' + (kw.active ? '暂停' : '启用') + '</button>'
-        + '<button class="kw-btn danger delete-btn" data-kwid="' + kw.id + '">删除</button>'
+        + '<button class="kw-btn toggle-btn" data-kwid="' + kw.id + '" data-active="' + kw.active + '">' + (kw.active ? t('pause') : t('enable')) + '</button>'
+        + '<button class="kw-btn danger delete-btn" data-kwid="' + kw.id + '">' + t('deleteTxt') + '</button>'
         + '</div>'
         + '</div>';
     }).join('');
@@ -544,7 +749,7 @@
   // === Render: Detail alerts ===
   function renderDetailAlerts(alerts) {
     if (!alerts || alerts.length === 0) {
-      detailAlerts.innerHTML = '<div class="empty-state">暂无告警</div>';
+      detailAlerts.innerHTML = '<div class="empty-state">' + t('noAlerts') + '</div>';
       return;
     }
     detailAlerts.innerHTML = alerts.map(function (a, i) {
@@ -552,7 +757,7 @@
         ? '<a href="' + esc(a.url) + '" target="_blank" rel="noopener">' + esc(a.title) + '</a>'
         : esc(a.title);
       var vCls = a.verified ? 'yes' : 'no';
-      var vLabel = a.verified ? '已验证' : '未通过';
+      var vLabel = a.verified ? t('verified') : t('notVerified');
       var delay = Math.min(i * 30, 200);
       return '<div class="alert-row" style="animation-delay:' + delay + 'ms">'
         + '<div class="a-title">' + titleHtml + '</div>'
@@ -570,7 +775,7 @@
   function renderDetailTrends(items) {
     var target = detailTrendsInner || detailTrends;
     if (!items || items.length === 0) {
-      target.innerHTML = '<div class="empty-state">暂无相关热点</div>';
+      target.innerHTML = '<div class="empty-state">' + t('noRelated') + '</div>';
       return;
     }
     target.innerHTML = items.map(function (item, i) {
@@ -592,7 +797,7 @@
   // === Render: Recent alerts ===
   function renderRecentAlerts(alerts) {
     if (!alerts || alerts.length === 0) {
-      recentAlertsEl.innerHTML = '<div class="empty-state">暂无告警记录</div>';
+      recentAlertsEl.innerHTML = '<div class="empty-state">' + t('noAlertRecords') + '</div>';
       return;
     }
     recentAlertsEl.innerHTML = alerts.map(function (a, i) {
@@ -719,6 +924,32 @@
 
   // === Toolbar initialization ===
 
+  // Language selector
+  var langDropdown = document.getElementById('langDropdown');
+  initDropdown(langDropdown, function (val) {
+    displayLang = val;
+    localStorage.setItem('displayLang', val);
+    applyUILanguage();
+    // Re-render active tab with new language
+    if (trendsTab.classList.contains('active')) { loadTrends(); loadSources('ai'); }
+    else if (generalTab.classList.contains('active')) { loadGeneralTrends(); loadSources('general'); }
+    else if (keywordsTab.classList.contains('active')) { loadKeywords(); loadRecentAlerts(); }
+  });
+  // Restore saved lang on init
+  if (displayLang !== 'zh') {
+    var langTrigger = langDropdown && langDropdown.querySelector('.dropdown-trigger');
+    if (langTrigger) {
+      langTrigger.dataset.value = displayLang;
+      langTrigger.querySelector('span').textContent = displayLang === 'en' ? 'English' : '中文';
+      var langMenu = langDropdown.querySelector('.dropdown-menu');
+      if (langMenu) {
+        langMenu.querySelectorAll('.dropdown-item').forEach(function (it) {
+          it.classList.toggle('active', it.dataset.value === displayLang);
+        });
+      }
+    }
+  }
+
   // AI Tab toolbar
   var aiSearchInput = document.getElementById('aiSearch');
   var aiSortDropdown = document.getElementById('aiSortDropdown');
@@ -838,19 +1069,47 @@
     alertBanner.style.display = 'none';
   });
 
+  // === Summary button click delegation ===
+  document.addEventListener('click', function (e) {
+    if (e.target.classList && e.target.classList.contains('btn-summary')) {
+      var id = parseInt(e.target.dataset.id);
+      if (!id) return;
+      e.target.textContent = t('generating');
+      e.target.disabled = true;
+      fetch('/api/trends/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id] }),
+      })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (data.summaries && data.summaries.length > 0) {
+          var el = e.target.closest('.trend-summary');
+          if (el) el.innerHTML = esc(data.summaries[0].summary);
+        } else {
+          e.target.textContent = t('noGenerate');
+        }
+      })
+      .catch(function () {
+        e.target.textContent = t('generateFailed');
+        e.target.disabled = false;
+      });
+    }
+  });
+
   // === Socket.IO ===
   socket.on('connect', function () {
-    statusEl.textContent = '已连接';
+    statusEl.textContent = t('connected');
     statusEl.className = 'conn-badge online';
   });
 
   socket.on('disconnect', function () {
-    statusEl.textContent = '断开连接';
+    statusEl.textContent = t('disconnected');
     statusEl.className = 'conn-badge offline';
   });
 
   socket.on('new-trends', function (data) {
-    statusEl.textContent = '新数据 ' + data.items.length + ' 条';
+    statusEl.textContent = t('newData') + ' ' + data.items.length + ' ' + t('items');
     statusEl.className = 'conn-badge online';
     if (trendsTab.classList.contains('active')) { loadTrends(); loadSources('ai'); }
     if (generalTab.classList.contains('active')) { loadGeneralTrends(); loadSources('general'); }
@@ -859,7 +1118,7 @@
   socket.on('fetch-status', function (data) {
     data.results.forEach(function (r) {
       var cls = r.error ? 't-err' : 't-ok';
-      var msg = r.error ? '失败' : r.count + ' 条';
+      var msg = r.error ? t('failed') : r.count + ' ' + t('items');
       showToast('<span class="t-source">' + esc(r.source) + '</span> <span class="' + cls + '">' + msg + '</span>');
     });
     refreshBtn.disabled = false;
@@ -878,7 +1137,7 @@
 
   socket.on('keyword-alert', function (data) {
     var count = data.alerts ? data.alerts.length : 0;
-    alertText.textContent = '「' + data.keyword + '」发现 ' + count + ' 条新的相关内容';
+    alertText.textContent = '「' + data.keyword + '」' + t('keywordFound') + ' ' + count + ' ' + t('newRelated');
     alertBanner.style.display = '';
     alertCount += count;
     alertCountEl.textContent = String(alertCount);
@@ -922,13 +1181,14 @@
   function timeAgo(dateStr) {
     var d = new Date(dateStr);
     var diff = (Date.now() - d.getTime()) / 1000;
-    if (diff < 60) return '刚刚';
-    if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
-    if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
-    return Math.floor(diff / 86400) + '天前';
+    if (diff < 60) return t('justNow');
+    if (diff < 3600) return Math.floor(diff / 60) + ' ' + t('minutesAgo');
+    if (diff < 86400) return Math.floor(diff / 3600) + ' ' + t('hoursAgo');
+    return Math.floor(diff / 86400) + ' ' + t('daysAgo');
   }
 
   // === Init ===
+  applyUILanguage();
   loadTrends();
   loadSources('ai');
   loadAnalysis();
